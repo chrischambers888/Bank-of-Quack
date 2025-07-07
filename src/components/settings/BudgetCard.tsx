@@ -15,7 +15,7 @@ interface BudgetCardProps {
   budgetSummary: BudgetSummary;
   onEdit: (budget: CategoryBudget) => void;
   onDelete: (budgetId: string) => void;
-  onToggleActive: (budgetId: string, isActive: boolean) => void;
+  onToggleActive?: (budgetId: string, isActive: boolean) => void;
 }
 
 export function BudgetCard({

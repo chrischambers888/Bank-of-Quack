@@ -112,23 +112,8 @@ export function BudgetsPage() {
     }
   };
 
-  const handleToggleActive = async (budgetId: string, isActive: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("category_budgets")
-        .update({ is_active: isActive })
-        .eq("id", budgetId);
-
-      if (error) throw error;
-      await loadData();
-    } catch (error) {
-      console.error("Error updating budget status:", error);
-      alert("Error updating budget status. Please try again.");
-    }
-  };
-
   const getBudgetStats = () => {
-    const activeBudgets = budgetSummaries.filter((b) => b.is_active);
+    const activeBudgets = budgetSummaries.filter((b) => b.budget_id); // Only consider budgets that actually exist
     const totalBudget = activeBudgets.reduce((sum, b) => {
       const budget =
         b.budget_type === "absolute"
@@ -229,14 +214,17 @@ export function BudgetsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Category Budgets</h2>
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <Dialog
+            open={isFormOpen && !selectedCategory}
+            onOpenChange={setIsFormOpen}
+          >
             <DialogTrigger asChild>
               <Button onClick={() => setSelectedCategory(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Budget
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
               <DialogHeader>
                 <DialogTitle>Add New Budget</DialogTitle>
               </DialogHeader>
@@ -246,7 +234,7 @@ export function BudgetsPage() {
                     <Button
                       key={category.id}
                       variant="outline"
-                      className="h-auto p-3 flex flex-col items-center space-y-2"
+                      className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
                       onClick={() => handleCreateBudget(category)}
                     >
                       {category.image_url && (
@@ -265,10 +253,13 @@ export function BudgetsPage() {
           </Dialog>
         </div>
 
-        {/* Budget Form Dialog */}
-        {selectedCategory && (
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogContent className="max-w-md">
+        {/* Budget Form Dialog (for editing or after picking a category) */}
+        {isFormOpen && selectedCategory && (
+          <Dialog
+            open={isFormOpen && !!selectedCategory}
+            onOpenChange={setIsFormOpen}
+          >
+            <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
               <BudgetForm
                 category={selectedCategory}
                 existingBudget={editingBudget || undefined}
@@ -285,19 +276,20 @@ export function BudgetsPage() {
 
         {/* Budget Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {budgetSummaries.map((budgetSummary) => (
-            <BudgetCard
-              key={budgetSummary.category_id}
-              budgetSummary={budgetSummary}
-              onEdit={handleEditBudget}
-              onDelete={(budgetId) => setDeletingBudgetId(budgetId)}
-              onToggleActive={handleToggleActive}
-            />
-          ))}
+          {budgetSummaries
+            .filter((budgetSummary) => budgetSummary.budget_id) // Only show categories with actual budgets
+            .map((budgetSummary) => (
+              <BudgetCard
+                key={budgetSummary.category_id}
+                budgetSummary={budgetSummary}
+                onEdit={handleEditBudget}
+                onDelete={(budgetId) => setDeletingBudgetId(budgetId)}
+              />
+            ))}
         </div>
 
         {/* Empty State */}
-        {budgetSummaries.length === 0 && (
+        {budgetSummaries.filter((b) => b.budget_id).length === 0 && (
           <Card className="text-center py-12">
             <CardContent>
               <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
