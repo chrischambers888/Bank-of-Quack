@@ -214,7 +214,7 @@ export function BudgetCard({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onDelete(budgetSummary.budget_id!)}
+              onClick={() => onDelete(budgetSummary.category_id)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>

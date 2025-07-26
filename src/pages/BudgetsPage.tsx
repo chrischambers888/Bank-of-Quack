@@ -52,8 +52,104 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAppData } from "@/hooks/useAppData";
 import { useBudgetMonthNavigation } from "@/hooks/useBudgetMonthNavigation";
+
+// Custom Month/Year Picker Component
+interface MonthYearPickerProps {
+  selectedYear: number;
+  selectedMonth: number;
+  onSelect: (year: number, month: number) => void;
+  className?: string;
+  showOKButton?: boolean;
+  onOK?: () => void;
+}
+
+function MonthYearPicker({
+  selectedYear,
+  selectedMonth,
+  onSelect,
+  className,
+  showOKButton = false,
+  onOK,
+}: MonthYearPickerProps) {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
+  return (
+    <div className={`space-y-4 ${className}`}>
+      {/* Year Selector */}
+      <div>
+        <Label className="text-white text-sm mb-2 block">Year</Label>
+        <div className="grid grid-cols-5 gap-2">
+          {years.map((year) => (
+            <Button
+              key={year}
+              variant={selectedYear === year ? "default" : "outline"}
+              size="sm"
+              onClick={() => onSelect(year, selectedMonth)}
+              className={`text-xs ${
+                selectedYear === year
+                  ? "bg-white text-black hover:bg-white/90"
+                  : "text-white border-white/20 hover:bg-white/10"
+              }`}
+            >
+              {year}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Month Selector */}
+      <div>
+        <Label className="text-white text-sm mb-2 block">Month</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {months.map((month, index) => (
+            <Button
+              key={month}
+              variant={selectedMonth === index + 1 ? "default" : "outline"}
+              size="sm"
+              onClick={() => onSelect(selectedYear, index + 1)}
+              className={`text-xs ${
+                selectedMonth === index + 1
+                  ? "bg-white text-black hover:bg-white/90"
+                  : "text-white border-white/20 hover:bg-white/10"
+              }`}
+            >
+              {month}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {showOKButton && onOK && (
+        <div className="pt-4">
+          <Button
+            onClick={onOK}
+            className="w-full bg-white text-black hover:bg-white/90"
+          >
+            OK
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function BudgetsPage() {
   const { user1AvatarUrl, user2AvatarUrl } = useAppData();
@@ -87,10 +183,39 @@ export function BudgetsPage() {
       now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
     return { year: prevYear, month: prevMonth + 1 };
   });
+  const [copyFromMonthHasData, setCopyFromMonthHasData] = useState(false);
+  const [showMainCalendar, setShowMainCalendar] = useState(false);
+  const [showCopyCalendar, setShowCopyCalendar] = useState(false);
+  const [tempMainSelection, setTempMainSelection] = useState<SelectedMonth>({
+    year: 0,
+    month: 0,
+  });
+  const [tempCopySelection, setTempCopySelection] = useState<SelectedMonth>({
+    year: 0,
+    month: 0,
+  });
 
   useEffect(() => {
     loadData();
   }, [selectedMonth]);
+
+  useEffect(() => {
+    if (showCopyDialog) {
+      checkCopyFromMonthData(copyFromMonth.year, copyFromMonth.month);
+    }
+  }, [showCopyDialog, copyFromMonth]);
+
+  useEffect(() => {
+    if (showMainCalendar) {
+      setTempMainSelection(selectedMonth);
+    }
+  }, [showMainCalendar, selectedMonth]);
+
+  useEffect(() => {
+    if (showCopyCalendar) {
+      setTempCopySelection(copyFromMonth);
+    }
+  }, [showCopyCalendar, copyFromMonth]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -157,12 +282,13 @@ export function BudgetsPage() {
     setEditingBudget(null);
   };
 
-  const handleDeleteBudget = async (budgetId: string) => {
+  const handleDeleteBudget = async (categoryId: string) => {
     try {
-      const { error } = await supabase
-        .from("category_budgets")
-        .delete()
-        .eq("id", budgetId);
+      const { error } = await supabase.rpc("delete_budget_period_for_month", {
+        p_category_id: categoryId,
+        p_year: selectedMonth.year,
+        p_month: selectedMonth.month,
+      });
 
       if (error) throw error;
       await loadData();
@@ -208,6 +334,54 @@ export function BudgetsPage() {
     } finally {
       setIsCopyingFromMonth(false);
     }
+  };
+
+  const checkCopyFromMonthData = async (year: number, month: number) => {
+    try {
+      const hasData = await checkMonthHasData(year, month);
+      setCopyFromMonthHasData(hasData);
+    } catch (error) {
+      console.error("Error checking copy from month data:", error);
+      setCopyFromMonthHasData(false);
+    }
+  };
+
+  const handleMainCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      changeMonth(date.getFullYear(), date.getMonth() + 1);
+      setShowMainCalendar(false);
+    }
+  };
+
+  const handleCopyCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setCopyFromMonth({
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+      });
+      checkCopyFromMonthData(date.getFullYear(), date.getMonth() + 1);
+      setShowCopyCalendar(false);
+    }
+  };
+
+  const handleMainMonthYearSelect = (year: number, month: number) => {
+    setTempMainSelection({ year, month });
+  };
+
+  const handleCopyMonthYearSelect = (year: number, month: number) => {
+    setTempCopySelection({ year, month });
+    checkCopyFromMonthData(year, month);
+  };
+
+  const handleMainOK = () => {
+    changeMonth(tempMainSelection.year, tempMainSelection.month);
+    setShowMainCalendar(false);
+  };
+
+  const handleCopyOK = () => {
+    setCopyFromMonth(tempCopySelection);
+    checkCopyFromMonthData(tempCopySelection.year, tempCopySelection.month);
+    setShowCopyCalendar(false);
   };
 
   const isCurrentMonth =
@@ -294,12 +468,33 @@ export function BudgetsPage() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-lg">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm min-w-[120px] text-center">
-                {selectedMonthName}
-              </span>
-            </div>
+            <Dialog open={showMainCalendar} onOpenChange={setShowMainCalendar}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-muted/80"
+                >
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm min-w-[120px] text-center">
+                    {selectedMonthName}
+                  </span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                <DialogHeader>
+                  <DialogTitle>Select Month</DialogTitle>
+                </DialogHeader>
+                <div className="p-4">
+                  <MonthYearPicker
+                    selectedYear={tempMainSelection.year}
+                    selectedMonth={tempMainSelection.month}
+                    onSelect={handleMainMonthYearSelect}
+                    showOKButton={true}
+                    onOK={handleMainOK}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
             <Button
               variant="ghost"
               size="icon"
@@ -418,6 +613,60 @@ export function BudgetsPage() {
         </div>
       )}
 
+      {/* Budget Form Dialogs - Always Available */}
+      <Dialog
+        open={isFormOpen && !selectedCategory}
+        onOpenChange={setIsFormOpen}
+      >
+        <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+          <DialogHeader>
+            <DialogTitle>Add New Budget</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant="outline"
+                  className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
+                  onClick={() => handleCreateBudget(category)}
+                >
+                  {category.image_url && (
+                    <img
+                      src={category.image_url}
+                      alt={category.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  )}
+                  <span className="text-sm">{category.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Budget Form Dialog (for editing or after picking a category) */}
+      {isFormOpen && selectedCategory && (
+        <Dialog
+          open={isFormOpen && !!selectedCategory}
+          onOpenChange={setIsFormOpen}
+        >
+          <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            <BudgetForm
+              category={selectedCategory}
+              existingBudget={editingBudget || undefined}
+              onSave={handleSaveBudget}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setSelectedCategory(null);
+                setEditingBudget(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Budget Cards */}
       {hasBudgetData && (
         <div className="space-y-4">
@@ -462,27 +711,6 @@ export function BudgetsPage() {
             </Dialog>
           </div>
 
-          {/* Budget Form Dialog (for editing or after picking a category) */}
-          {isFormOpen && selectedCategory && (
-            <Dialog
-              open={isFormOpen && !!selectedCategory}
-              onOpenChange={setIsFormOpen}
-            >
-              <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
-                <BudgetForm
-                  category={selectedCategory}
-                  existingBudget={editingBudget || undefined}
-                  onSave={handleSaveBudget}
-                  onCancel={() => {
-                    setIsFormOpen(false);
-                    setSelectedCategory(null);
-                    setEditingBudget(null);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          )}
-
           {/* Budget Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {budgetSummaries
@@ -492,7 +720,7 @@ export function BudgetsPage() {
                   key={budgetSummary.category_id}
                   budgetSummary={budgetSummary}
                   onEdit={handleEditBudget}
-                  onDelete={(budgetId) => setDeletingBudgetId(budgetId)}
+                  onDelete={(categoryId) => setDeletingBudgetId(categoryId)}
                   user1AvatarUrl={user1AvatarUrl}
                   user2AvatarUrl={user2AvatarUrl}
                   selectedMonth={selectedMonth}
@@ -525,7 +753,7 @@ export function BudgetsPage() {
       <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
         <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
           <DialogHeader>
-            <DialogTitle>Copy Budgets from Previous Month</DialogTitle>
+            <DialogTitle>Copy Budgets from Another Month</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -544,27 +772,52 @@ export function BudgetsPage() {
                         ? copyFromMonth.year - 1
                         : copyFromMonth.year;
                     setCopyFromMonth({ year: newYear, month: newMonth });
+                    checkCopyFromMonthData(newYear, newMonth);
                   }}
                   className="hover:bg-white/10"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <div className="flex items-center space-x-2 px-4 py-2 bg-black/20 rounded-lg flex-1 justify-center">
-                  <Calendar className="h-4 w-4 text-gray-300" />
-                  <span className="font-medium text-sm">
-                    {(() => {
-                      const date = new Date(
-                        copyFromMonth.year,
-                        copyFromMonth.month - 1,
-                        1
-                      );
-                      return date.toLocaleDateString("en-US", {
-                        month: "long",
-                        year: "numeric",
-                      });
-                    })()}
-                  </span>
-                </div>
+                <Dialog
+                  open={showCopyCalendar}
+                  onOpenChange={setShowCopyCalendar}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="flex items-center space-x-2 px-4 py-2 bg-black/20 rounded-lg flex-1 justify-center hover:bg-black/30"
+                    >
+                      <Calendar className="h-4 w-4 text-gray-300" />
+                      <span className="font-medium text-sm">
+                        {(() => {
+                          const date = new Date(
+                            copyFromMonth.year,
+                            copyFromMonth.month - 1,
+                            1
+                          );
+                          return date.toLocaleDateString("en-US", {
+                            month: "long",
+                            year: "numeric",
+                          });
+                        })()}
+                      </span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-sm bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                    <DialogHeader>
+                      <DialogTitle>Select Month to Copy From</DialogTitle>
+                    </DialogHeader>
+                    <div className="p-4">
+                      <MonthYearPicker
+                        selectedYear={tempCopySelection.year}
+                        selectedMonth={tempCopySelection.month}
+                        onSelect={handleCopyMonthYearSelect}
+                        showOKButton={true}
+                        onOK={handleCopyOK}
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -576,12 +829,18 @@ export function BudgetsPage() {
                         ? copyFromMonth.year + 1
                         : copyFromMonth.year;
                     setCopyFromMonth({ year: newYear, month: newMonth });
+                    checkCopyFromMonthData(newYear, newMonth);
                   }}
                   className="hover:bg-white/10"
                 >
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
+              {!copyFromMonthHasData && (
+                <p className="text-sm text-red-300 mt-2">
+                  No budget data available for this month
+                </p>
+              )}
             </div>
             <div className="flex space-x-2 pt-4">
               <Button
@@ -589,14 +848,18 @@ export function BudgetsPage() {
                 variant="outline"
                 onClick={() => setShowCopyDialog(false)}
                 disabled={isCopyingFromMonth}
-                className="flex-1"
+                className="flex-1 text-white border-white/20 hover:bg-white/10"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCopyFromMonth}
-                disabled={isCopyingFromMonth}
-                className="flex-1"
+                disabled={isCopyingFromMonth || !copyFromMonthHasData}
+                className={`flex-1 ${
+                  !copyFromMonthHasData && !isCopyingFromMonth
+                    ? "bg-red-600 hover:bg-red-700"
+                    : ""
+                }`}
               >
                 {isCopyingFromMonth ? "Copying..." : "Copy Budgets"}
               </Button>
@@ -612,10 +875,13 @@ export function BudgetsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete Budget for {selectedMonthName}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this budget? This action cannot be
-              undone.
+              Are you sure you want to delete this budget for{" "}
+              {selectedMonthName}? This will only remove the budget for this
+              specific month and cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -629,7 +895,7 @@ export function BudgetsPage() {
               }}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              Delete Budget for {selectedMonthName}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
