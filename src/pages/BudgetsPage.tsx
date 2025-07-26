@@ -310,7 +310,11 @@ export function BudgetsPage() {
       await loadData();
     } catch (error) {
       console.error("Error carrying forward budgets:", error);
-      alert("Error carrying forward budgets. Please try again.");
+      if (error instanceof Error) {
+        alert(`Error carrying forward budgets: ${error.message}`);
+      } else {
+        alert("Error carrying forward budgets. Please try again.");
+      }
     } finally {
       setIsCarryingForward(false);
     }
@@ -330,7 +334,11 @@ export function BudgetsPage() {
       setShowCopyDialog(false);
     } catch (error) {
       console.error("Error copying budgets:", error);
-      alert("Error copying budgets. Please try again.");
+      if (error instanceof Error) {
+        alert(`Error copying budgets: ${error.message}`);
+      } else {
+        alert("Error copying budgets. Please try again.");
+      }
     } finally {
       setIsCopyingFromMonth(false);
     }

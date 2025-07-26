@@ -127,7 +127,12 @@ export function BudgetForm({
       onSave();
     } catch (error) {
       console.error("Error saving budget:", error);
-      alert("Error saving budget. Please try again.");
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        alert(`Error saving budget: ${error.message}`);
+      } else {
+        alert("Error saving budget. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
