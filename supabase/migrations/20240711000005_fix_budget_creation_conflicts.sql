@@ -2,8 +2,18 @@
 -- Fix the create_budget_for_month function to handle existing budgets properly
 
 -- Add unique constraint to budget_periods to support upsert
-alter table budget_periods 
-add constraint if not exists unique_budget_period unique (category_budget_id, year, month);
+-- First check if the constraint already exists
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.table_constraints 
+    where constraint_name = 'unique_budget_period' 
+    and table_name = 'budget_periods'
+  ) then
+    alter table budget_periods 
+    add constraint unique_budget_period unique (category_budget_id, year, month);
+  end if;
+end $$;
 
 -- Drop the existing function
 drop function if exists public.create_budget_for_month(uuid, integer, integer, text, numeric, numeric, numeric);
