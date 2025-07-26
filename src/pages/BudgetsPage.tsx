@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -34,7 +35,13 @@ import {
 } from "@/components/ui/select";
 import { BudgetForm } from "@/components/settings/BudgetForm";
 import { BudgetCard } from "@/components/settings/BudgetCard";
-import { Category, BudgetSummary, CategoryBudget, MonthOption } from "@/types";
+import {
+  Category,
+  BudgetSummary,
+  CategoryBudget,
+  MonthOption,
+  SelectedMonth,
+} from "@/types";
 import { supabase } from "@/supabaseClient";
 import {
   Plus,
@@ -42,6 +49,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Calendar,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import { useAppData } from "@/hooks/useAppData";
 import { useBudgetMonthNavigation } from "@/hooks/useBudgetMonthNavigation";
@@ -69,6 +78,15 @@ export function BudgetsPage() {
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
   const [hasBudgetData, setHasBudgetData] = useState(true);
   const [isCarryingForward, setIsCarryingForward] = useState(false);
+  const [isCopyingFromMonth, setIsCopyingFromMonth] = useState(false);
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [copyFromMonth, setCopyFromMonth] = useState<SelectedMonth>(() => {
+    const now = new Date();
+    const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const prevYear =
+      now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    return { year: prevYear, month: prevMonth + 1 };
+  });
 
   useEffect(() => {
     loadData();
@@ -172,6 +190,34 @@ export function BudgetsPage() {
     }
   };
 
+  const handleCopyFromMonth = async () => {
+    setIsCopyingFromMonth(true);
+    try {
+      const { error } = await supabase.rpc("copy_budgets_from_month", {
+        p_from_year: copyFromMonth.year,
+        p_from_month: copyFromMonth.month,
+        p_to_year: selectedMonth.year,
+        p_to_month: selectedMonth.month,
+      });
+      if (error) throw error;
+      await loadData();
+      setShowCopyDialog(false);
+    } catch (error) {
+      console.error("Error copying budgets:", error);
+      alert("Error copying budgets. Please try again.");
+    } finally {
+      setIsCopyingFromMonth(false);
+    }
+  };
+
+  const isCurrentMonth =
+    selectedMonth.year === new Date().getFullYear() &&
+    selectedMonth.month === new Date().getMonth() + 1;
+  const isFutureMonth =
+    selectedMonth.year > new Date().getFullYear() ||
+    (selectedMonth.year === new Date().getFullYear() &&
+      selectedMonth.month > new Date().getMonth() + 1);
+
   const getBudgetStats = () => {
     const activeBudgets = budgetSummaries.filter((b) => b.budget_id); // Only consider budgets that actually exist
     const totalBudget = activeBudgets.reduce((sum, b) => {
@@ -198,12 +244,12 @@ export function BudgetsPage() {
   const selectedMonthValue = `${selectedMonth.year}-${selectedMonth.month
     .toString()
     .padStart(2, "0")}`;
-  const selectedMonthName =
-    monthOptions.find(
-      (option) =>
-        option.year === selectedMonth.year &&
-        option.month === selectedMonth.month
-    )?.month_name || `${selectedMonth.month}/${selectedMonth.year}`;
+
+  // Create proper month name for any month (not just the last 24)
+  const selectedMonthName = (() => {
+    const date = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  })();
 
   if (isLoading) {
     return (
@@ -232,27 +278,44 @@ export function BudgetsPage() {
         {/* Month Selector */}
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select
-              value={selectedMonthValue}
-              onValueChange={handleMonthChange}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                const newMonth =
+                  selectedMonth.month === 1 ? 12 : selectedMonth.month - 1;
+                const newYear =
+                  selectedMonth.month === 1
+                    ? selectedMonth.year - 1
+                    : selectedMonth.year;
+                changeMonth(newYear, newMonth);
+              }}
+              className="hover:bg-muted"
             >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((option) => (
-                  <SelectItem
-                    key={`${option.year}-${option.month}`}
-                    value={`${option.year}-${option.month
-                      .toString()
-                      .padStart(2, "0")}`}
-                  >
-                    {option.month_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-lg">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm min-w-[120px] text-center">
+                {selectedMonthName}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                const newMonth =
+                  selectedMonth.month === 12 ? 1 : selectedMonth.month + 1;
+                const newYear =
+                  selectedMonth.month === 12
+                    ? selectedMonth.year + 1
+                    : selectedMonth.year;
+                changeMonth(newYear, newMonth);
+              }}
+              className="hover:bg-muted"
+            >
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>
@@ -272,17 +335,24 @@ export function BudgetsPage() {
                 : "No budgets were configured for this month."}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {selectedMonth.year === new Date().getFullYear() &&
-                selectedMonth.month === new Date().getMonth() + 1 && (
-                  <Button
-                    onClick={handleCarryForwardBudgets}
-                    disabled={isCarryingForward}
-                  >
-                    {isCarryingForward
-                      ? "Carrying Forward..."
-                      : "Carry Forward Previous Budgets"}
-                  </Button>
-                )}
+              <Button
+                onClick={() => setShowCopyDialog(true)}
+                disabled={isCopyingFromMonth}
+                variant="outline"
+              >
+                {isCopyingFromMonth ? "Copying..." : "Copy from another Month"}
+              </Button>
+              {isFutureMonth && (
+                <Button
+                  onClick={handleCarryForwardBudgets}
+                  disabled={isCarryingForward}
+                  variant="outline"
+                >
+                  {isCarryingForward
+                    ? "Carrying Forward..."
+                    : "Carry Forward Current Budgets"}
+                </Button>
+              )}
               <Button onClick={() => setIsFormOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Budget for {selectedMonthName}
@@ -450,6 +520,90 @@ export function BudgetsPage() {
           )}
         </div>
       )}
+
+      {/* Copy from Month Dialog */}
+      <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
+        <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+          <DialogHeader>
+            <DialogTitle>Copy Budgets from Previous Month</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-gray-300">
+                Select month to copy from:
+              </Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const newMonth =
+                      copyFromMonth.month === 1 ? 12 : copyFromMonth.month - 1;
+                    const newYear =
+                      copyFromMonth.month === 1
+                        ? copyFromMonth.year - 1
+                        : copyFromMonth.year;
+                    setCopyFromMonth({ year: newYear, month: newMonth });
+                  }}
+                  className="hover:bg-white/10"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center space-x-2 px-4 py-2 bg-black/20 rounded-lg flex-1 justify-center">
+                  <Calendar className="h-4 w-4 text-gray-300" />
+                  <span className="font-medium text-sm">
+                    {(() => {
+                      const date = new Date(
+                        copyFromMonth.year,
+                        copyFromMonth.month - 1,
+                        1
+                      );
+                      return date.toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
+                      });
+                    })()}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const newMonth =
+                      copyFromMonth.month === 12 ? 1 : copyFromMonth.month + 1;
+                    const newYear =
+                      copyFromMonth.month === 12
+                        ? copyFromMonth.year + 1
+                        : copyFromMonth.year;
+                    setCopyFromMonth({ year: newYear, month: newMonth });
+                  }}
+                  className="hover:bg-white/10"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCopyDialog(false)}
+                disabled={isCopyingFromMonth}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCopyFromMonth}
+                disabled={isCopyingFromMonth}
+                className="flex-1"
+              >
+                {isCopyingFromMonth ? "Copying..." : "Copy Budgets"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog
