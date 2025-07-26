@@ -77,6 +77,11 @@ export function BudgetCard({
     loadUserNames();
   }, []);
 
+  // Safety check to prevent rendering with null budgetSummary
+  if (!budgetSummary) {
+    return null;
+  }
+
   const {
     category_name,
     category_image,
@@ -96,7 +101,7 @@ export function BudgetCard({
     budget_type && (absolute_amount || (user1_amount && user2_amount));
   const totalBudget =
     budget_type === "absolute"
-      ? absolute_amount
+      ? absolute_amount || 0
       : (user1_amount || 0) + (user2_amount || 0);
   const spentPercentage =
     totalBudget && current_period_spent
@@ -109,8 +114,8 @@ export function BudgetCard({
     return "bg-green-500";
   };
 
-  const formatCurrency = (amount: number | undefined) => {
-    return amount !== undefined ? `$${amount.toFixed(2)}` : "$0.00";
+  const formatCurrency = (amount: number | null | undefined) => {
+    return amount != null ? `$${amount.toFixed(2)}` : "$0.00";
   };
 
   const formatDate = (dateString: string) => {
