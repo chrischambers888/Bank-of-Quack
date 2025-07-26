@@ -46,8 +46,8 @@ export function BudgetCard({
       ? absolute_amount
       : (user1_amount || 0) + (user2_amount || 0);
   const spentPercentage =
-    current_period_budget && current_period_spent
-      ? Math.min((current_period_spent / current_period_budget) * 100, 100)
+    totalBudget && current_period_spent
+      ? Math.min((current_period_spent / totalBudget) * 100, 100)
       : 0;
 
   const getProgressColor = (percentage: number) => {
@@ -131,13 +131,13 @@ export function BudgetCard({
         </div>
 
         {/* Current Period Progress */}
-        {hasBudget && current_period_budget && (
+        {hasBudget && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">This Month:</span>
               <span className="font-medium">
                 {formatCurrency(current_period_spent)} /{" "}
-                {formatCurrency(current_period_budget)}
+                {formatCurrency(totalBudget)}
               </span>
             </div>
 
@@ -145,10 +145,8 @@ export function BudgetCard({
 
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
-                {current_period_remaining_percentage !== undefined
-                  ? `${current_period_remaining_percentage.toFixed(
-                      1
-                    )}% remaining`
+                {totalBudget && current_period_spent !== undefined
+                  ? `${(100 - spentPercentage).toFixed(1)}% remaining`
                   : "No spending data"}
               </span>
               <span
@@ -157,7 +155,9 @@ export function BudgetCard({
                   "text-"
                 )}
               >
-                {formatCurrency(current_period_remaining_amount)}
+                {formatCurrency(
+                  totalBudget ? totalBudget - (current_period_spent || 0) : 0
+                )}
               </span>
             </div>
 

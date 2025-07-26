@@ -91,6 +91,8 @@ export function BudgetsPage() {
   };
 
   const handleSaveBudget = async () => {
+    // Add a small delay to ensure database triggers have time to execute
+    await new Promise((resolve) => setTimeout(resolve, 500));
     await loadData();
     setIsFormOpen(false);
     setSelectedCategory(null);
