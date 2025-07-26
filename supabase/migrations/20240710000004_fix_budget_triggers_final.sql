@@ -4,6 +4,7 @@
 -- Drop any existing triggers that might conflict
 drop trigger if exists trigger_create_current_budget_period on public.category_budgets;
 drop trigger if exists trigger_handle_budget_changes on public.category_budgets;
+drop trigger if exists trigger_handle_budget_delete on public.category_budgets;
 
 -- Create the comprehensive trigger that handles both INSERT and UPDATE operations
 create trigger trigger_handle_budget_changes
