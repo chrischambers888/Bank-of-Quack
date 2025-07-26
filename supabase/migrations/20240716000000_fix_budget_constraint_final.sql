@@ -1,10 +1,56 @@
--- 20240715000000_final_budget_fix.sql
--- Final fix for budget creation - completely replace the function with clean logic
+-- 20240716000000_fix_budget_constraint_final.sql
+-- Fix the actual budget constraint issue - remove the problematic uq_category_budget constraint
+
+-- First, let's identify and remove the problematic constraint
+do $$
+begin
+  -- Drop the problematic constraint that prevents multiple budgets per category
+  if exists (
+    select 1 from information_schema.table_constraints 
+    where constraint_name = 'uq_category_budget' 
+    and table_name = 'category_budgets'
+  ) then
+    alter table category_budgets drop constraint uq_category_budget;
+    raise notice 'Dropped problematic uq_category_budget constraint';
+  end if;
+  
+  -- Also drop any other problematic constraints
+  if exists (
+    select 1 from information_schema.table_constraints 
+    where constraint_name = 'unique_category_month' 
+    and table_name = 'category_budgets'
+  ) then
+    alter table category_budgets drop constraint unique_category_month;
+    raise notice 'Dropped unique_category_month constraint';
+  end if;
+  
+  -- Drop budget_periods constraint if it exists
+  if exists (
+    select 1 from information_schema.table_constraints 
+    where constraint_name = 'unique_budget_period' 
+    and table_name = 'budget_periods'
+  ) then
+    alter table budget_periods drop constraint unique_budget_period;
+    raise notice 'Dropped unique_budget_period constraint';
+  end if;
+end $$;
+
+-- Add the correct unique constraint on category_budgets
+-- This allows multiple budgets per category as long as they're for different months/years
+alter table category_budgets 
+add constraint unique_category_month unique (category_id, year, month);
+
+-- Add the correct unique constraint on budget_periods
+alter table budget_periods 
+add constraint unique_budget_period unique (category_budget_id, year, month);
 
 -- Drop all existing functions that might interfere
 drop function if exists public.create_budget_for_month(uuid, integer, integer, text, numeric, numeric, numeric);
 drop function if exists public.debug_budget_creation(uuid, integer, integer);
 drop function if exists public.list_category_budgets(uuid);
+drop function if exists public.test_budget_creation_fix();
+drop function if exists public.test_simple_budget_creation();
+drop function if exists public.test_budget_creation();
 
 -- Create the final, clean version of create_budget_for_month
 create or replace function public.create_budget_for_month(
@@ -93,51 +139,47 @@ begin
 end;
 $$;
 
--- Create a simple test function to verify the fix works
-create or replace function public.test_budget_creation_fix()
-returns text
-language plpgsql
-security definer
-as $$
+-- Create a simple test to verify the fix works
+do $$
 declare
   v_category_id uuid;
   v_budget_id1 uuid;
   v_budget_id2 uuid;
-  v_result text := '';
 begin
   -- Get a category to test with
   select id into v_category_id from categories limit 1;
   
   if v_category_id is null then
-    return 'No categories found for testing';
+    raise notice 'No categories found for testing';
+    return;
   end if;
   
-  v_result := 'Testing budget creation with category: ' || v_category_id;
+  raise notice 'Testing budget creation with category: %', v_category_id;
   
   -- Test 1: Create budget for March 2025
   begin
     select create_budget_for_month(v_category_id, 2025, 3, 'absolute', 100, null, null) into v_budget_id1;
-    v_result := v_result || ' | ✓ Created budget for March 2025';
+    raise notice '✓ Created budget for March 2025: %', v_budget_id1;
   exception when others then
-    v_result := v_result || ' | ✗ Failed to create budget for March 2025: ' || SQLERRM;
-    return v_result;
+    raise notice '✗ Failed to create budget for March 2025: %', SQLERRM;
+    return;
   end;
   
   -- Test 2: Create budget for April 2025 (different month, should work)
   begin
     select create_budget_for_month(v_category_id, 2025, 4, 'absolute', 200, null, null) into v_budget_id2;
-    v_result := v_result || ' | ✓ Created budget for April 2025';
+    raise notice '✓ Created budget for April 2025: %', v_budget_id2;
   exception when others then
-    v_result := v_result || ' | ✗ Failed to create budget for April 2025: ' || SQLERRM;
-    return v_result;
+    raise notice '✗ Failed to create budget for April 2025: %', SQLERRM;
+    return;
   end;
   
   -- Test 3: Try to create another budget for March 2025 (should update existing)
   begin
     select create_budget_for_month(v_category_id, 2025, 3, 'absolute', 150, null, null) into v_budget_id1;
-    v_result := v_result || ' | ✓ Updated budget for March 2025';
+    raise notice '✓ Updated budget for March 2025: %', v_budget_id1;
   exception when others then
-    v_result := v_result || ' | ✗ Failed to update budget for March 2025: ' || SQLERRM;
+    raise notice '✗ Failed to update budget for March 2025: %', SQLERRM;
   end;
   
   -- Clean up test data
@@ -151,12 +193,5 @@ begin
     delete from category_budgets where id = v_budget_id2;
   end if;
   
-  return v_result;
-end;
-$$;
-
--- Run the test
-select public.test_budget_creation_fix();
-
--- Clean up test function
-drop function if exists public.test_budget_creation_fix(); 
+  raise notice '✓ Budget creation test completed successfully';
+end $$; 
