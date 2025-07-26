@@ -129,17 +129,7 @@ export function BudgetForm({
       console.error("Error saving budget:", error);
       // Provide more specific error messages
       if (error instanceof Error) {
-        const errorMessage = error.message;
-        if (
-          errorMessage.includes("unique") ||
-          errorMessage.includes("already exists")
-        ) {
-          alert(
-            "A budget already exists for this category in the selected month/year. Please select a different month or edit the existing budget."
-          );
-        } else {
-          alert(`Error saving budget: ${errorMessage}`);
-        }
+        alert(`Error saving budget: ${error.message}`);
       } else {
         alert("Error saving budget. Please try again.");
       }
