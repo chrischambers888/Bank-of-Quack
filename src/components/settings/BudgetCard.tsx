@@ -15,7 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BudgetSummary, CategoryBudget, Transaction } from "@/types";
+import {
+  BudgetSummary,
+  CategoryBudget,
+  Transaction,
+  SelectedMonth,
+} from "@/types";
 import { Edit, Trash2, Receipt } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
@@ -27,6 +32,7 @@ interface BudgetCardProps {
   onToggleActive?: (budgetId: string, isActive: boolean) => void;
   user1AvatarUrl?: string | null;
   user2AvatarUrl?: string | null;
+  selectedMonth?: SelectedMonth;
 }
 
 export function BudgetCard({
@@ -36,6 +42,7 @@ export function BudgetCard({
   onToggleActive,
   user1AvatarUrl,
   user2AvatarUrl,
+  selectedMonth,
 }: BudgetCardProps) {
   const [userNames, setUserNames] = useState({
     user1: "User 1",
@@ -113,8 +120,9 @@ export function BudgetCard({
   const loadTransactions = async () => {
     setIsLoadingTransactions(true);
     try {
-      const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth() + 1;
+      // Use selected month if provided, otherwise use current month
+      const targetYear = selectedMonth?.year || new Date().getFullYear();
+      const targetMonth = selectedMonth?.month || new Date().getMonth() + 1;
 
       const { data, error } = await supabase
         .from("transactions")
@@ -123,11 +131,11 @@ export function BudgetCard({
         .eq("transaction_type", "expense")
         .gte(
           "date",
-          `${currentYear}-${currentMonth.toString().padStart(2, "0")}-01`
+          `${targetYear}-${targetMonth.toString().padStart(2, "0")}-01`
         )
         .lt(
           "date",
-          `${currentYear}-${(currentMonth + 1).toString().padStart(2, "0")}-01`
+          `${targetYear}-${(targetMonth + 1).toString().padStart(2, "0")}-01`
         )
         .order("date", { ascending: false });
 
@@ -143,6 +151,18 @@ export function BudgetCard({
   const handleViewTransactions = () => {
     setShowTransactions(true);
     loadTransactions();
+  };
+
+  // Get month name for display
+  const getMonthName = () => {
+    if (!selectedMonth) {
+      return new Date().toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
+    }
+    const date = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
 
   return (
@@ -214,7 +234,7 @@ export function BudgetCard({
         {hasBudget && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">This Month:</span>
+              <span className="text-muted-foreground">{getMonthName()}:</span>
               <span className="font-medium">
                 {formatCurrency(current_period_spent)} /{" "}
                 {formatCurrency(totalBudget)}
@@ -415,7 +435,7 @@ export function BudgetCard({
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden bg-gradient-to-b from-[#004D40] to-[#26A69A] text-gray-200 border-gray-600">
           <DialogHeader>
             <DialogTitle className="text-gray-200">
-              {category_name} - This Month's Transactions
+              {category_name} - {getMonthName()} Transactions
             </DialogTitle>
           </DialogHeader>
 
@@ -448,7 +468,7 @@ export function BudgetCard({
               ) : transactions.length === 0 ? (
                 <div className="text-center py-8 text-gray-300">
                   <Receipt className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No transactions this month</p>
+                  <p>No transactions in {getMonthName()}</p>
                 </div>
               ) : (
                 <div className="space-y-2">

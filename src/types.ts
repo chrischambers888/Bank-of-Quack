@@ -95,3 +95,15 @@ export interface BudgetFormData {
   user1_amount?: number;
   user2_amount?: number;
 }
+
+// Month navigation types
+export interface MonthOption {
+  year: number;
+  month: number;
+  month_name: string;
+}
+
+export interface SelectedMonth {
+  year: number;
+  month: number;
+}

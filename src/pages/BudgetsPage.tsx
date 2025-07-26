@@ -25,15 +25,37 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BudgetForm } from "@/components/settings/BudgetForm";
 import { BudgetCard } from "@/components/settings/BudgetCard";
-import { Category, BudgetSummary, CategoryBudget } from "@/types";
+import { Category, BudgetSummary, CategoryBudget, MonthOption } from "@/types";
 import { supabase } from "@/supabaseClient";
-import { Plus, DollarSign, TrendingUp, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  Calendar,
+} from "lucide-react";
 import { useAppData } from "@/hooks/useAppData";
+import { useBudgetMonthNavigation } from "@/hooks/useBudgetMonthNavigation";
 
 export function BudgetsPage() {
   const { user1AvatarUrl, user2AvatarUrl } = useAppData();
+  const {
+    selectedMonth,
+    changeMonth,
+    generateMonthOptions,
+    carryForwardBudgets,
+    checkMonthHasData,
+  } = useBudgetMonthNavigation();
+
   const [budgetSummaries, setBudgetSummaries] = useState<BudgetSummary[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,10 +67,12 @@ export function BudgetsPage() {
   );
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
+  const [hasBudgetData, setHasBudgetData] = useState(true);
+  const [isCarryingForward, setIsCarryingForward] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedMonth]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -62,14 +86,28 @@ export function BudgetsPage() {
       if (categoriesError) throw categoriesError;
       setCategories(categoriesData || []);
 
-      // Load budget summaries
-      const { data: budgetData, error: budgetError } = await supabase
-        .from("budget_summary")
-        .select("*")
-        .order("category_name");
+      // Check if the selected month has budget data
+      const monthHasData = await checkMonthHasData(
+        selectedMonth.year,
+        selectedMonth.month
+      );
+      setHasBudgetData(monthHasData);
 
-      if (budgetError) throw budgetError;
-      setBudgetSummaries(budgetData || []);
+      if (monthHasData) {
+        // Load budget summaries for the selected month
+        const { data: budgetData, error: budgetError } = await supabase.rpc(
+          "get_budget_summary_for_month",
+          {
+            p_year: selectedMonth.year,
+            p_month: selectedMonth.month,
+          }
+        );
+
+        if (budgetError) throw budgetError;
+        setBudgetSummaries(budgetData || []);
+      } else {
+        setBudgetSummaries([]);
+      }
     } catch (error) {
       console.error("Error loading budget data:", error);
     } finally {
@@ -116,6 +154,24 @@ export function BudgetsPage() {
     }
   };
 
+  const handleMonthChange = (value: string) => {
+    const [year, month] = value.split("-").map(Number);
+    changeMonth(year, month);
+  };
+
+  const handleCarryForwardBudgets = async () => {
+    setIsCarryingForward(true);
+    try {
+      await carryForwardBudgets(selectedMonth.year, selectedMonth.month);
+      await loadData();
+    } catch (error) {
+      console.error("Error carrying forward budgets:", error);
+      alert("Error carrying forward budgets. Please try again.");
+    } finally {
+      setIsCarryingForward(false);
+    }
+  };
+
   const getBudgetStats = () => {
     const activeBudgets = budgetSummaries.filter((b) => b.budget_id); // Only consider budgets that actually exist
     const totalBudget = activeBudgets.reduce((sum, b) => {
@@ -138,6 +194,16 @@ export function BudgetsPage() {
   };
 
   const stats = getBudgetStats();
+  const monthOptions = generateMonthOptions();
+  const selectedMonthValue = `${selectedMonth.year}-${selectedMonth.month
+    .toString()
+    .padStart(2, "0")}`;
+  const selectedMonthName =
+    monthOptions.find(
+      (option) =>
+        option.year === selectedMonth.year &&
+        option.month === selectedMonth.month
+    )?.month_name || `${selectedMonth.month}/${selectedMonth.year}`;
 
   if (isLoading) {
     return (
@@ -162,157 +228,228 @@ export function BudgetsPage() {
             Manage your monthly spending budgets
           </p>
         </div>
-      </div>
 
-      {/* Budget Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${stats.totalBudget.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">This month's budget</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${stats.totalSpent.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.overallPercentage.toFixed(1)}% of budget used
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Remaining</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${
-                stats.totalRemaining < 0 ? "text-red-600" : "text-green-600"
-              }`}
+        {/* Month Selector */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedMonthValue}
+              onValueChange={handleMonthChange}
             >
-              ${stats.totalRemaining.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalRemaining < 0 ? "Over budget" : "Available"}
-            </p>
-          </CardContent>
-        </Card>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((option) => (
+                  <SelectItem
+                    key={`${option.year}-${option.month}`}
+                    value={`${option.year}-${option.month
+                      .toString()
+                      .padStart(2, "0")}`}
+                  >
+                    {option.month_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
-      {/* Budget Cards */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Category Budgets</h2>
-          <Dialog
-            open={isFormOpen && !selectedCategory}
-            onOpenChange={setIsFormOpen}
-          >
-            <DialogTrigger asChild>
-              <Button onClick={() => setSelectedCategory(null)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Budget
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
-              <DialogHeader>
-                <DialogTitle>Add New Budget</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                  {categories.map((category) => (
-                    <Button
-                      key={category.id}
-                      variant="outline"
-                      className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
-                      onClick={() => handleCreateBudget(category)}
-                    >
-                      {category.image_url && (
-                        <img
-                          src={category.image_url}
-                          alt={category.name}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      )}
-                      <span className="text-sm">{category.name}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {/* Budget Form Dialog (for editing or after picking a category) */}
-        {isFormOpen && selectedCategory && (
-          <Dialog
-            open={isFormOpen && !!selectedCategory}
-            onOpenChange={setIsFormOpen}
-          >
-            <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
-              <BudgetForm
-                category={selectedCategory}
-                existingBudget={editingBudget || undefined}
-                onSave={handleSaveBudget}
-                onCancel={() => {
-                  setIsFormOpen(false);
-                  setSelectedCategory(null);
-                  setEditingBudget(null);
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* Budget Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {budgetSummaries
-            .filter((budgetSummary) => budgetSummary.budget_id) // Only show categories with actual budgets
-            .map((budgetSummary) => (
-              <BudgetCard
-                key={budgetSummary.category_id}
-                budgetSummary={budgetSummary}
-                onEdit={handleEditBudget}
-                onDelete={(budgetId) => setDeletingBudgetId(budgetId)}
-                user1AvatarUrl={user1AvatarUrl}
-                user2AvatarUrl={user2AvatarUrl}
-              />
-            ))}
-        </div>
-
-        {/* Empty State */}
-        {budgetSummaries.filter((b) => b.budget_id).length === 0 && (
-          <Card className="text-center py-12">
-            <CardContent>
-              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                No budgets configured
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Create budgets for your categories to track monthly spending
-              </p>
+      {/* No Budget Data Message */}
+      {!hasBudgetData && (
+        <Card className="text-center py-12">
+          <CardContent>
+            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              No budget data for {selectedMonthName}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {selectedMonth.year === new Date().getFullYear() &&
+              selectedMonth.month === new Date().getMonth() + 1
+                ? "No budgets have been set up for this month yet."
+                : "No budgets were configured for this month."}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {selectedMonth.year === new Date().getFullYear() &&
+                selectedMonth.month === new Date().getMonth() + 1 && (
+                  <Button
+                    onClick={handleCarryForwardBudgets}
+                    disabled={isCarryingForward}
+                  >
+                    {isCarryingForward
+                      ? "Carrying Forward..."
+                      : "Carry Forward Previous Budgets"}
+                  </Button>
+                )}
               <Button onClick={() => setIsFormOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Your First Budget
+                Create Budget for {selectedMonthName}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Budget Overview Stats */}
+      {hasBudgetData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Budget
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${stats.totalBudget.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedMonthName}'s budget
+              </p>
             </CardContent>
           </Card>
-        )}
-      </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${stats.totalSpent.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.overallPercentage.toFixed(1)}% of budget used
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Remaining</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div
+                className={`text-2xl font-bold ${
+                  stats.totalRemaining < 0 ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                ${stats.totalRemaining.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.totalRemaining < 0 ? "Over budget" : "Available"}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Budget Cards */}
+      {hasBudgetData && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Category Budgets</h2>
+            <Dialog
+              open={isFormOpen && !selectedCategory}
+              onOpenChange={setIsFormOpen}
+            >
+              <DialogTrigger asChild>
+                <Button onClick={() => setSelectedCategory(null)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Budget
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                <DialogHeader>
+                  <DialogTitle>Add New Budget</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    {categories.map((category) => (
+                      <Button
+                        key={category.id}
+                        variant="outline"
+                        className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
+                        onClick={() => handleCreateBudget(category)}
+                      >
+                        {category.image_url && (
+                          <img
+                            src={category.image_url}
+                            alt={category.name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        )}
+                        <span className="text-sm">{category.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Budget Form Dialog (for editing or after picking a category) */}
+          {isFormOpen && selectedCategory && (
+            <Dialog
+              open={isFormOpen && !!selectedCategory}
+              onOpenChange={setIsFormOpen}
+            >
+              <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                <BudgetForm
+                  category={selectedCategory}
+                  existingBudget={editingBudget || undefined}
+                  onSave={handleSaveBudget}
+                  onCancel={() => {
+                    setIsFormOpen(false);
+                    setSelectedCategory(null);
+                    setEditingBudget(null);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Budget Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {budgetSummaries
+              .filter((budgetSummary) => budgetSummary.budget_id) // Only show categories with actual budgets
+              .map((budgetSummary) => (
+                <BudgetCard
+                  key={budgetSummary.category_id}
+                  budgetSummary={budgetSummary}
+                  onEdit={handleEditBudget}
+                  onDelete={(budgetId) => setDeletingBudgetId(budgetId)}
+                  user1AvatarUrl={user1AvatarUrl}
+                  user2AvatarUrl={user2AvatarUrl}
+                  selectedMonth={selectedMonth}
+                />
+              ))}
+          </div>
+
+          {/* Empty State */}
+          {budgetSummaries.filter((b) => b.budget_id).length === 0 && (
+            <Card className="text-center py-12">
+              <CardContent>
+                <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  No budgets configured for {selectedMonthName}
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Create budgets for your categories to track monthly spending
+                </p>
+                <Button onClick={() => setIsFormOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Budget
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog
