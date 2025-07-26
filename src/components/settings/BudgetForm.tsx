@@ -17,6 +17,7 @@ import { supabase } from "@/supabaseClient";
 interface BudgetFormProps {
   category: Category;
   existingBudget?: CategoryBudget;
+  selectedMonth?: { year: number; month: number };
   onSave: () => void;
   onCancel: () => void;
 }
@@ -24,6 +25,7 @@ interface BudgetFormProps {
 export function BudgetForm({
   category,
   existingBudget,
+  selectedMonth,
   onSave,
   onCancel,
 }: BudgetFormProps) {
@@ -84,36 +86,38 @@ export function BudgetForm({
     try {
       if (existingBudget) {
         // Update existing budget
-        const { error } = await supabase
-          .from("category_budgets")
-          .update({
-            budget_type: formData.budget_type,
-            absolute_amount:
-              formData.budget_type === "absolute"
-                ? formData.absolute_amount
-                : null,
-            user1_amount:
-              formData.budget_type === "split" ? formData.user1_amount : null,
-            user2_amount:
-              formData.budget_type === "split" ? formData.user2_amount : null,
-
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingBudget.id);
-
-        if (error) throw error;
-      } else {
-        // Create new budget
-        const { error } = await supabase.from("category_budgets").insert({
-          category_id: formData.category_id,
-          budget_type: formData.budget_type,
-          absolute_amount:
+        const { error } = await supabase.rpc("update_budget_for_month", {
+          p_budget_id: existingBudget.id,
+          p_budget_type: formData.budget_type,
+          p_absolute_amount:
             formData.budget_type === "absolute"
               ? formData.absolute_amount
               : null,
-          user1_amount:
+          p_user1_amount:
             formData.budget_type === "split" ? formData.user1_amount : null,
-          user2_amount:
+          p_user2_amount:
+            formData.budget_type === "split" ? formData.user2_amount : null,
+        });
+
+        if (error) throw error;
+      } else {
+        // Create new budget for the selected month
+        const currentDate = new Date();
+        const year = selectedMonth?.year || currentDate.getFullYear();
+        const month = selectedMonth?.month || currentDate.getMonth() + 1;
+
+        const { error } = await supabase.rpc("create_budget_for_month", {
+          p_category_id: formData.category_id,
+          p_year: year,
+          p_month: month,
+          p_budget_type: formData.budget_type,
+          p_absolute_amount:
+            formData.budget_type === "absolute"
+              ? formData.absolute_amount
+              : null,
+          p_user1_amount:
+            formData.budget_type === "split" ? formData.user1_amount : null,
+          p_user2_amount:
             formData.budget_type === "split" ? formData.user2_amount : null,
         });
 

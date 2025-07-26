@@ -284,7 +284,7 @@ export function BudgetsPage() {
 
   const handleDeleteBudget = async (categoryId: string) => {
     try {
-      const { error } = await supabase.rpc("delete_budget_period_for_month", {
+      const { error } = await supabase.rpc("delete_budget_for_month", {
         p_category_id: categoryId,
         p_year: selectedMonth.year,
         p_month: selectedMonth.month,
@@ -656,6 +656,7 @@ export function BudgetsPage() {
             <BudgetForm
               category={selectedCategory}
               existingBudget={editingBudget || undefined}
+              selectedMonth={selectedMonth}
               onSave={handleSaveBudget}
               onCancel={() => {
                 setIsFormOpen(false);

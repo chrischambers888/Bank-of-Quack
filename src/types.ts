@@ -33,6 +33,8 @@ export interface Sector {
 export interface CategoryBudget {
   id: string;
   category_id: string;
+  year: number;
+  month: number;
   created_at?: string;
   updated_at?: string;
   budget_type: 'absolute' | 'split';
