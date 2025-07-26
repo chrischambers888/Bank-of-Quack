@@ -41,7 +41,7 @@ const FloatingActionNav: React.FC = () => {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button
-          className="fixed bottom-6 right-6 z-50 rounded-full p-0 w-14 h-14 shadow-lg bg-primary text-white sm:hidden flex items-center justify-center text-3xl hover:bg-primary/90 transition-all"
+          className="fixed bottom-6 right-6 z-10 rounded-full p-0 w-14 h-14 shadow-lg bg-primary text-white sm:hidden flex items-center justify-center text-3xl hover:bg-primary/90 transition-all"
           aria-label="Open navigation menu"
         >
           <Plus className="w-8 h-8" />
