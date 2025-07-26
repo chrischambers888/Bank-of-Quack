@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { CustomProgress } from "@/components/ui/custom-progress";
 import {
   Dialog,
   DialogContent,
@@ -17,12 +18,15 @@ import {
 import { BudgetSummary, CategoryBudget, Transaction } from "@/types";
 import { Edit, Trash2, Receipt } from "lucide-react";
 import { supabase } from "@/supabaseClient";
+import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 
 interface BudgetCardProps {
   budgetSummary: BudgetSummary;
   onEdit: (budget: CategoryBudget) => void;
   onDelete: (budgetId: string) => void;
   onToggleActive?: (budgetId: string, isActive: boolean) => void;
+  user1AvatarUrl?: string | null;
+  user2AvatarUrl?: string | null;
 }
 
 export function BudgetCard({
@@ -30,6 +34,8 @@ export function BudgetCard({
   onEdit,
   onDelete,
   onToggleActive,
+  user1AvatarUrl,
+  user2AvatarUrl,
 }: BudgetCardProps) {
   const [userNames, setUserNames] = useState({
     user1: "User 1",
@@ -38,6 +44,7 @@ export function BudgetCard({
   const [showTransactions, setShowTransactions] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const { yellowThreshold, redThreshold } = useBudgetSettings();
 
   useEffect(() => {
     // Load user names from app settings
@@ -90,8 +97,8 @@ export function BudgetCard({
       : 0;
 
   const getProgressColor = (percentage: number) => {
-    if (percentage >= 90) return "bg-red-500";
-    if (percentage >= 75) return "bg-yellow-500";
+    if (percentage >= redThreshold) return "bg-red-500";
+    if (percentage >= yellowThreshold) return "bg-yellow-500";
     return "bg-green-500";
   };
 
@@ -201,19 +208,6 @@ export function BudgetCard({
             <span className="text-muted-foreground">Monthly Budget:</span>
             <span className="font-medium">{formatCurrency(totalBudget)}</span>
           </div>
-
-          {budget_type === "split" && (
-            <div className="text-xs text-muted-foreground space-y-1">
-              <div className="flex justify-between">
-                <span>{userNames.user1}:</span>
-                <span>{formatCurrency(user1_amount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>{userNames.user2}:</span>
-                <span>{formatCurrency(user2_amount)}</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Current Period Progress */}
@@ -227,7 +221,20 @@ export function BudgetCard({
               </span>
             </div>
 
-            <Progress value={spentPercentage} className="h-2" />
+            <CustomProgress
+              value={spentPercentage}
+              className="h-4"
+              backgroundColor={
+                spentPercentage >= redThreshold ? "rgb(239 68 68)" : undefined
+              }
+              indicatorColor={
+                spentPercentage >= redThreshold
+                  ? "rgb(239 68 68)"
+                  : spentPercentage >= yellowThreshold
+                  ? "rgb(234 179 8)"
+                  : "rgb(34 197 94)"
+              }
+            />
 
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
@@ -248,15 +255,154 @@ export function BudgetCard({
             </div>
 
             {/* User Spending Breakdown */}
-            {budget_type === "split" && (
-              <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
-                <div className="flex justify-between">
-                  <span>{userNames.user1} spent:</span>
-                  <span>{formatCurrency(current_period_user1_spent)}</span>
+            {(budget_type === "split" || budget_type === "absolute") && (
+              <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                <div className="flex justify-between items-center">
+                  <span>
+                    {userNames.user1}:{" "}
+                    {formatCurrency(current_period_user1_spent)}
+                    {budget_type === "split" &&
+                      ` / ${formatCurrency(user1_amount)}`}
+                  </span>
+                  <span>
+                    {userNames.user2}:{" "}
+                    {formatCurrency(current_period_user2_spent)}
+                    {budget_type === "split" &&
+                      ` / ${formatCurrency(user2_amount)}`}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>{userNames.user2} spent:</span>
-                  <span>{formatCurrency(current_period_user2_spent)}</span>
+                <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                  {/* User 1 Progress */}
+                  <div
+                    className="absolute left-0 h-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }%`,
+                      backgroundColor:
+                        budget_type === "split" &&
+                        (current_period_user1_spent || 0) >= (user1_amount || 0)
+                          ? "rgb(239 68 68)"
+                          : budget_type === "split" &&
+                            (current_period_user1_spent || 0) >=
+                              ((user1_amount || 0) * yellowThreshold) / 100
+                          ? "rgb(234 179 8)"
+                          : "rgb(34 197 94)",
+                    }}
+                  />
+                  {/* User 2 Progress */}
+                  <div
+                    className="absolute right-0 h-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        ((current_period_user2_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }%`,
+                      backgroundColor:
+                        budget_type === "split" &&
+                        (current_period_user2_spent || 0) >= (user2_amount || 0)
+                          ? "rgb(239 68 68)"
+                          : budget_type === "split" &&
+                            (current_period_user2_spent || 0) >=
+                              ((user2_amount || 0) * yellowThreshold) / 100
+                          ? "rgb(234 179 8)"
+                          : "rgb(34 197 94)",
+                    }}
+                  />
+                  {/* User 1 Avatar */}
+                  <div
+                    className="absolute top-1/2 flex items-center justify-center"
+                    style={{
+                      left: `calc(${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }% / 2)`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                      {user1AvatarUrl ? (
+                        <img
+                          src={user1AvatarUrl}
+                          alt={`${userNames.user1} avatar`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-white font-bold">
+                          {userNames.user1.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* User 2 Avatar */}
+                  <div
+                    className="absolute top-1/2 flex items-center justify-center"
+                    style={{
+                      left: `calc(${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }% + (${
+                        ((current_period_user2_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }% / 2))`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                      {user2AvatarUrl ? (
+                        <img
+                          src={user2AvatarUrl}
+                          alt={`${userNames.user2} avatar`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-white font-bold">
+                          {userNames.user2.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Dividing Line */}
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-white opacity-80"
+                    style={{
+                      left: `${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }%`,
+                    }}
+                  />
                 </div>
               </div>
             )}

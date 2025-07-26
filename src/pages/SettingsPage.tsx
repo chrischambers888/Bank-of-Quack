@@ -11,6 +11,7 @@ import CategorySettings from "@/components/settings/CategorySettings";
 import SectorSettings from "@/components/settings/SectorSettings";
 import SectorCategoryManagement from "@/components/settings/SectorCategoryManagement";
 import TransactionManagement from "@/components/settings/TransactionManagement";
+import { BudgetSettings } from "@/components/settings/BudgetSettings";
 import ImportDialog from "@/components/settings/ImportDialog";
 
 interface Transaction {
@@ -228,6 +229,8 @@ const SettingsPage = () => {
           addCategoryToSector={addCategoryToSector}
           removeCategoryFromSector={removeCategoryFromSector}
         />
+
+        <BudgetSettings />
 
         <TransactionManagement
           transactions={transactions}

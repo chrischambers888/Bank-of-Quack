@@ -30,8 +30,10 @@ import { BudgetCard } from "@/components/settings/BudgetCard";
 import { Category, BudgetSummary, CategoryBudget } from "@/types";
 import { supabase } from "@/supabaseClient";
 import { Plus, DollarSign, TrendingUp, AlertTriangle } from "lucide-react";
+import { useAppData } from "@/hooks/useAppData";
 
 export function BudgetsPage() {
+  const { user1AvatarUrl, user2AvatarUrl } = useAppData();
   const [budgetSummaries, setBudgetSummaries] = useState<BudgetSummary[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -286,6 +288,8 @@ export function BudgetsPage() {
                 budgetSummary={budgetSummary}
                 onEdit={handleEditBudget}
                 onDelete={(budgetId) => setDeletingBudgetId(budgetId)}
+                user1AvatarUrl={user1AvatarUrl}
+                user2AvatarUrl={user2AvatarUrl}
               />
             ))}
         </div>
