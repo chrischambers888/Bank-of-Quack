@@ -500,17 +500,17 @@ export function BudgetsPage() {
   return (
     <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Budgets</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Budgets</h1>
+          <p className="text-muted-foreground text-sm sm:text-base hidden sm:block">
             Manage your monthly spending budgets
           </p>
         </div>
 
         {/* Month Selector */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-center sm:justify-end">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             <Button
               variant="ghost"
               size="icon"
@@ -531,10 +531,10 @@ export function BudgetsPage() {
               <DialogTrigger asChild>
                 <Button
                   variant="outline"
-                  className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-muted/80"
+                  className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 bg-muted hover:bg-muted/80"
                 >
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm min-w-[120px] text-center">
+                  <span className="font-medium text-xs sm:text-sm min-w-[80px] sm:min-w-[120px] text-center">
                     {selectedMonthName}
                   </span>
                 </Button>
@@ -730,16 +730,22 @@ export function BudgetsPage() {
       {/* Budget Cards */}
       {hasBudgetData && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Category Budgets</h2>
-            <div className="flex gap-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-lg sm:text-xl font-semibold">
+              Category Budgets
+            </h2>
+            <div className="flex gap-2 sm:gap-1">
               <Dialog
                 open={isFormOpen && !selectedCategory}
                 onOpenChange={setIsFormOpen}
               >
                 <DialogTrigger asChild>
-                  <Button onClick={() => setSelectedCategory(null)}>
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button
+                    onClick={() => setSelectedCategory(null)}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    <Plus className="h-4 w-4 mr-1 sm:mr-2" />
                     Add Budget
                   </Button>
                 </DialogTrigger>
@@ -774,15 +780,17 @@ export function BudgetsPage() {
                 onClick={handleDeleteAllBudgets}
                 disabled={isDeletingAllBudgets}
                 variant="destructive"
+                size="sm"
+                className="text-xs sm:text-sm"
               >
                 {isDeletingAllBudgets ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
                     Deleting...
                   </>
                 ) : (
                   <>
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
                     Delete All Budgets
                   </>
                 )}
