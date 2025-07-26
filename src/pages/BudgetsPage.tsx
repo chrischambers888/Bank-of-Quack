@@ -51,6 +51,7 @@ import {
   Calendar,
   ArrowLeft,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAppData } from "@/hooks/useAppData";
@@ -176,6 +177,7 @@ export function BudgetsPage() {
   const [isCarryingForward, setIsCarryingForward] = useState(false);
   const [isCopyingFromMonth, setIsCopyingFromMonth] = useState(false);
   const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [isDeletingAllBudgets, setIsDeletingAllBudgets] = useState(false);
   const [copyFromMonth, setCopyFromMonth] = useState<SelectedMonth>(() => {
     const now = new Date();
     const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
@@ -295,6 +297,55 @@ export function BudgetsPage() {
     } catch (error) {
       console.error("Error deleting budget:", error);
       alert("Error deleting budget. Please try again.");
+    }
+  };
+
+  const handleDeleteAllBudgets = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to delete all budgets for ${selectedMonthName}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingAllBudgets(true);
+    try {
+      // Get all budget IDs for the selected month
+      const { data: budgets, error: fetchError } = await supabase
+        .from("category_budgets")
+        .select("id")
+        .eq("year", selectedMonth.year)
+        .eq("month", selectedMonth.month);
+
+      if (fetchError) throw fetchError;
+
+      if (budgets && budgets.length > 0) {
+        // Delete all budget periods first (due to foreign key constraints)
+        const budgetIds = budgets.map((b) => b.id);
+
+        const { error: deletePeriodsError } = await supabase
+          .from("budget_periods")
+          .delete()
+          .in("category_budget_id", budgetIds);
+
+        if (deletePeriodsError) throw deletePeriodsError;
+
+        // Delete all category budgets
+        const { error: deleteBudgetsError } = await supabase
+          .from("category_budgets")
+          .delete()
+          .in("id", budgetIds);
+
+        if (deleteBudgetsError) throw deleteBudgetsError;
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting all budgets:", error);
+      alert("Error deleting all budgets. Please try again.");
+    } finally {
+      setIsDeletingAllBudgets(false);
     }
   };
 
@@ -681,43 +732,62 @@ export function BudgetsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Category Budgets</h2>
-            <Dialog
-              open={isFormOpen && !selectedCategory}
-              onOpenChange={setIsFormOpen}
-            >
-              <DialogTrigger asChild>
-                <Button onClick={() => setSelectedCategory(null)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Budget
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
-                <DialogHeader>
-                  <DialogTitle>Add New Budget</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                    {categories.map((category) => (
-                      <Button
-                        key={category.id}
-                        variant="outline"
-                        className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
-                        onClick={() => handleCreateBudget(category)}
-                      >
-                        {category.image_url && (
-                          <img
-                            src={category.image_url}
-                            alt={category.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        )}
-                        <span className="text-sm">{category.name}</span>
-                      </Button>
-                    ))}
+            <div className="flex gap-1">
+              <Dialog
+                open={isFormOpen && !selectedCategory}
+                onOpenChange={setIsFormOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button onClick={() => setSelectedCategory(null)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Budget
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                  <DialogHeader>
+                    <DialogTitle>Add New Budget</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                      {categories.map((category) => (
+                        <Button
+                          key={category.id}
+                          variant="outline"
+                          className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
+                          onClick={() => handleCreateBudget(category)}
+                        >
+                          {category.image_url && (
+                            <img
+                              src={category.image_url}
+                              alt={category.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          )}
+                          <span className="text-sm">{category.name}</span>
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+              <Button
+                onClick={handleDeleteAllBudgets}
+                disabled={isDeletingAllBudgets}
+                variant="destructive"
+              >
+                {isDeletingAllBudgets ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete All Budgets
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Budget Cards Grid */}
