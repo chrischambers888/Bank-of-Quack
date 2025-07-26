@@ -39,6 +39,9 @@ drop function if exists public.handle_budget_changes();
 drop function if exists public.handle_budget_delete();
 drop function if exists public.create_current_budget_period();
 drop function if exists public.upsert_budget_periods_for_budget();
+drop function if exists public.delete_budget_period_for_month(uuid, integer, integer);
+drop function if exists public.copy_budgets_from_month(integer, integer, integer, integer);
+drop function if exists public.carry_forward_budgets_to_month(integer, integer);
 
 -- Create new function for creating month-specific budgets
 create or replace function public.create_budget_for_month(
@@ -238,6 +241,9 @@ begin
   end loop;
 end;
 $$;
+
+-- Drop the existing function first
+drop function if exists public.get_budget_summary_for_month(integer, integer);
 
 -- Update the get_budget_summary_for_month function
 create or replace function public.get_budget_summary_for_month(
