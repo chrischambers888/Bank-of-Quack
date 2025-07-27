@@ -328,18 +328,19 @@ export function BudgetCard({
                         100
                       }%`,
                       backgroundColor:
-                        // For zero budgets, any spending should be red
-                        (totalBudget === 0 &&
-                          (current_period_user1_spent || 0) > 0) ||
-                        (budget_type === "split" &&
-                          (current_period_user1_spent || 0) >=
-                            (user1_amount || 0))
-                          ? "rgb(239 68 68)"
-                          : budget_type === "split" &&
+                        budget_type === "split"
+                          ? // For split budgets, use color coding based on budget adherence
+                            (totalBudget === 0 &&
+                              (current_period_user1_spent || 0) > 0) ||
                             (current_period_user1_spent || 0) >=
+                              (user1_amount || 0)
+                            ? "rgb(239 68 68)"
+                            : (current_period_user1_spent || 0) >=
                               ((user1_amount || 0) * yellowThreshold) / 100
-                          ? "rgb(234 179 8)"
-                          : "rgb(34 197 94)",
+                            ? "rgb(234 179 8)"
+                            : "rgb(34 197 94)"
+                          : // For absolute budgets, use neutral gray
+                            "rgb(156 163 175)",
                     }}
                   />
                   {/* User 2 Progress */}
@@ -356,18 +357,19 @@ export function BudgetCard({
                         100
                       }%`,
                       backgroundColor:
-                        // For zero budgets, any spending should be red
-                        (totalBudget === 0 &&
-                          (current_period_user2_spent || 0) > 0) ||
-                        (budget_type === "split" &&
-                          (current_period_user2_spent || 0) >=
-                            (user2_amount || 0))
-                          ? "rgb(239 68 68)"
-                          : budget_type === "split" &&
+                        budget_type === "split"
+                          ? // For split budgets, use color coding based on budget adherence
+                            (totalBudget === 0 &&
+                              (current_period_user2_spent || 0) > 0) ||
                             (current_period_user2_spent || 0) >=
+                              (user2_amount || 0)
+                            ? "rgb(239 68 68)"
+                            : (current_period_user2_spent || 0) >=
                               ((user2_amount || 0) * yellowThreshold) / 100
-                          ? "rgb(234 179 8)"
-                          : "rgb(34 197 94)",
+                            ? "rgb(234 179 8)"
+                            : "rgb(34 197 94)"
+                          : // For absolute budgets, use neutral gray
+                            "rgb(156 163 175)",
                     }}
                   />
                   {/* User 1 Avatar */}
