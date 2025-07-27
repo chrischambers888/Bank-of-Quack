@@ -20,6 +20,23 @@ interface BudgetFormProps {
   selectedMonth?: { year: number; month: number };
   onSave: () => void;
   onCancel: () => void;
+  sectorBudgets?: Array<{
+    sector_id: string;
+    sector_name: string;
+    budget_type: "absolute" | "split";
+    absolute_amount?: number;
+    user1_amount?: number;
+    user2_amount?: number;
+    auto_rollup: boolean;
+    category_ids: string[];
+  }>;
+  currentBudgets?: Array<{
+    category_id: string;
+    budget_type: "absolute" | "split";
+    absolute_amount?: number;
+    user1_amount?: number;
+    user2_amount?: number;
+  }>;
 }
 
 export function BudgetForm({
@@ -28,6 +45,8 @@ export function BudgetForm({
   selectedMonth,
   onSave,
   onCancel,
+  sectorBudgets = [],
+  currentBudgets = [],
 }: BudgetFormProps) {
   const [formData, setFormData] = useState<BudgetFormData>({
     category_id: category.id,
@@ -38,6 +57,7 @@ export function BudgetForm({
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [userNames, setUserNames] = useState({
     user1: "User 1",
     user2: "User 2",
@@ -82,6 +102,23 @@ export function BudgetForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null); // Clear any previous errors
+
+    // Pre-validate sector budget constraints
+    const sectorConstraintError = validateSectorBudgetConstraints();
+    if (sectorConstraintError) {
+      setError(sectorConstraintError);
+      setIsLoading(false);
+      return;
+    }
+
+    // Allow $0 budgets - they are valid
+    const totalAmount = getTotalAmount();
+    if (totalAmount < 0) {
+      setError("Budget amount cannot be negative.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       if (existingBudget) {
@@ -127,12 +164,22 @@ export function BudgetForm({
       onSave();
     } catch (error) {
       console.error("Error saving budget:", error);
-      // Provide more specific error messages
+      let errorMessage = "Error saving budget. Please try again.";
+
       if (error instanceof Error) {
-        alert(`Error saving budget: ${error.message}`);
-      } else {
-        alert("Error saving budget. Please try again.");
+        // Check for the specific constraint error
+        if (
+          error.message.includes(
+            "cannot be less than the sum of category budgets"
+          )
+        ) {
+          errorMessage = `Category budget amount cannot exceed the sector budget limit. Please reduce the budget amount or increase the sector budget.`;
+        } else {
+          errorMessage = `Error saving budget: ${error.message}`;
+        }
       }
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -140,16 +187,69 @@ export function BudgetForm({
 
   const validateForm = () => {
     if (formData.budget_type === "absolute") {
-      return formData.absolute_amount && formData.absolute_amount > 0;
+      return (
+        formData.absolute_amount !== undefined && formData.absolute_amount >= 0
+      );
     } else {
       return (
         formData.user1_amount !== undefined &&
         formData.user1_amount >= 0 &&
         formData.user2_amount !== undefined &&
-        formData.user2_amount >= 0 &&
-        (formData.user1_amount > 0 || formData.user2_amount > 0)
+        formData.user2_amount >= 0
       );
     }
+  };
+
+  const getTotalAmount = () => {
+    if (formData.budget_type === "absolute") {
+      return formData.absolute_amount || 0;
+    } else {
+      return (formData.user1_amount || 0) + (formData.user2_amount || 0);
+    }
+  };
+
+  const validateSectorBudgetConstraints = () => {
+    const newBudgetAmount = getTotalAmount();
+
+    // Find sectors that contain this category and have manual budgets (not auto-rollup)
+    const relevantSectors = sectorBudgets.filter(
+      (sector) =>
+        sector.category_ids.includes(category.id) && !sector.auto_rollup
+    );
+
+    for (const sector of relevantSectors) {
+      const sectorBudgetAmount =
+        sector.budget_type === "absolute"
+          ? sector.absolute_amount || 0
+          : (sector.user1_amount || 0) + (sector.user2_amount || 0);
+
+      // Calculate current category budgets total for this sector
+      const currentCategoryBudgetsTotal = currentBudgets
+        .filter(
+          (budget) =>
+            sector.category_ids.includes(budget.category_id) &&
+            budget.category_id !== category.id // Exclude current category if editing
+        )
+        .reduce((total, budget) => {
+          const budgetAmount =
+            budget.budget_type === "absolute"
+              ? budget.absolute_amount || 0
+              : (budget.user1_amount || 0) + (budget.user2_amount || 0);
+          return total + budgetAmount;
+        }, 0);
+
+      const totalAfterNewBudget = currentCategoryBudgetsTotal + newBudgetAmount;
+
+      if (totalAfterNewBudget > sectorBudgetAmount) {
+        return `Adding this budget would exceed the sector budget limit for "${
+          sector.sector_name
+        }" ($${sectorBudgetAmount.toFixed(
+          2
+        )}). Please reduce the budget amount or increase the sector budget.`;
+      }
+    }
+
+    return null;
   };
 
   return (
@@ -162,6 +262,27 @@ export function BudgetForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Error Display */}
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+              <div className="flex items-center space-x-2">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-red-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="text-sm text-red-400">{error}</div>
+              </div>
+            </div>
+          )}
           {/* Budget Type Toggle */}
           <div className="space-y-2">
             <Label>Budget Type</Label>
@@ -204,13 +325,16 @@ export function BudgetForm({
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    absolute_amount: e.target.value
-                      ? parseFloat(e.target.value)
-                      : undefined,
+                    absolute_amount:
+                      e.target.value !== ""
+                        ? parseFloat(e.target.value)
+                        : undefined,
                   }))
                 }
-                required
               />
+              <p className="text-xs text-muted-foreground">
+                Enter 0 to set a zero budget (no spending allowed)
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -226,12 +350,12 @@ export function BudgetForm({
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      user1_amount: e.target.value
-                        ? parseFloat(e.target.value)
-                        : undefined,
+                      user1_amount:
+                        e.target.value !== ""
+                          ? parseFloat(e.target.value)
+                          : undefined,
                     }))
                   }
-                  required
                 />
               </div>
               <div className="space-y-2">
@@ -246,23 +370,29 @@ export function BudgetForm({
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      user2_amount: e.target.value
-                        ? parseFloat(e.target.value)
-                        : undefined,
+                      user2_amount:
+                        e.target.value !== ""
+                          ? parseFloat(e.target.value)
+                          : undefined,
                     }))
                   }
-                  required
                 />
               </div>
               {formData.user1_amount !== undefined &&
                 formData.user2_amount !== undefined && (
-                  <div className="text-sm text-muted-foreground">
-                    Total: $
-                    {(
-                      (formData.user1_amount || 0) +
-                      (formData.user2_amount || 0)
-                    ).toFixed(2)}
-                  </div>
+                  <>
+                    <div className="text-sm text-muted-foreground">
+                      Total: $
+                      {(
+                        (formData.user1_amount || 0) +
+                        (formData.user2_amount || 0)
+                      ).toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Enter 0 for both users to set a zero budget (no spending
+                      allowed)
+                    </p>
+                  </>
                 )}
             </div>
           )}

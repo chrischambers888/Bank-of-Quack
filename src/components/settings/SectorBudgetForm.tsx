@@ -222,6 +222,11 @@ export function SectorBudgetForm({
                 : "0.00"
             }
           />
+          {!formData.auto_rollup && (
+            <p className="text-xs text-gray-300">
+              Enter 0 to set a zero budget (no spending allowed)
+            </p>
+          )}
           {formData.auto_rollup && (
             <p className="text-xs text-gray-300">
               Amount will be automatically calculated from category budgets in
@@ -250,6 +255,9 @@ export function SectorBudgetForm({
               className="bg-card border-border text-foreground"
               placeholder="0.00"
             />
+            <p className="text-xs text-gray-300">
+              Enter 0 to set a zero budget (no spending allowed)
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="user2-amount" className="text-white">
@@ -270,6 +278,9 @@ export function SectorBudgetForm({
               className="bg-card border-border text-foreground"
               placeholder="0.00"
             />
+            <p className="text-xs text-gray-300">
+              Enter 0 to set a zero budget (no spending allowed)
+            </p>
           </div>
         </div>
       )}
@@ -305,6 +316,11 @@ export function SectorBudgetForm({
         <div className="text-2xl font-bold text-white">
           ${getTotalAmount().toFixed(2)}
         </div>
+        {getTotalAmount() === 0 && !formData.auto_rollup && (
+          <p className="text-xs text-gray-300">
+            Zero budget set - no spending allowed for this sector
+          </p>
+        )}
       </div>
 
       <div className="flex space-x-2 pt-4">
@@ -320,7 +336,7 @@ export function SectorBudgetForm({
         <Button
           type="submit"
           disabled={
-            isSubmitting || (!formData.auto_rollup && getTotalAmount() <= 0)
+            isSubmitting || (!formData.auto_rollup && getTotalAmount() < 0)
           }
           className="flex-1"
         >

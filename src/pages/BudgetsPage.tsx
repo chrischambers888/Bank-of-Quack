@@ -846,6 +846,25 @@ export function BudgetsPage() {
               category={selectedCategory}
               existingBudget={editingBudget || undefined}
               selectedMonth={selectedMonth}
+              sectorBudgets={sectorBudgetSummaries.map((summary) => ({
+                sector_id: summary.sector_id,
+                sector_name: summary.sector_name,
+                budget_type: summary.budget_type!,
+                absolute_amount: summary.absolute_amount,
+                user1_amount: summary.user1_amount,
+                user2_amount: summary.user2_amount,
+                auto_rollup: summary.auto_rollup,
+                category_ids:
+                  sectors.find((s) => s.id === summary.sector_id)
+                    ?.category_ids || [],
+              }))}
+              currentBudgets={budgetSummaries.map((summary) => ({
+                category_id: summary.category_id,
+                budget_type: summary.budget_type!,
+                absolute_amount: summary.absolute_amount,
+                user1_amount: summary.user1_amount,
+                user2_amount: summary.user2_amount,
+              }))}
               onSave={handleSaveBudget}
               onCancel={() => {
                 setIsFormOpen(false);
