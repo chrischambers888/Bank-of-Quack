@@ -67,7 +67,7 @@ begin
       now()
     ) returning id into v_new_sector_budget_id;
     
-    -- Copy the corresponding sector budget period
+    -- Copy the corresponding sector budget period with calculated spent amounts
     insert into public.sector_budget_periods (
       sector_budget_id,
       year,
@@ -84,15 +84,31 @@ begin
       p_to_year,
       p_to_month,
       budget_amount,
-      0, -- Reset spent amounts for new month
-      0, -- Reset user1 spent
-      0, -- Reset user2 spent
+      coalesce(sector_spent.total_spent, 0),
+      coalesce(sector_spent.user1_spent, 0),
+      coalesce(sector_spent.user2_spent, 0),
       now(),
       now()
-    from public.sector_budget_periods
-    where sector_budget_id = v_sector_budget.id
-      and year = p_from_year_adjusted 
-      and month = p_from_month;
+    from public.sector_budget_periods sbp
+    left join (
+      -- Calculate actual spent amounts for this sector in the target month
+      select 
+        sc.sector_id,
+        coalesce(sum(t.amount), 0) as total_spent,
+        coalesce(sum(case when t.paid_by_user_name = (select value from public.app_settings where key = 'user1_name') then t.amount else 0 end), 0) as user1_spent,
+        coalesce(sum(case when t.paid_by_user_name = (select value from public.app_settings where key = 'user2_name') then t.amount else 0 end), 0) as user2_spent
+      from public.sector_categories sc
+      join public.categories c on sc.category_id = c.id
+      left join public.transactions t on c.id = t.category_id 
+        and t.transaction_type = 'expense'
+        and extract(year from t.date) = p_to_year
+        and extract(month from t.date) = p_to_month
+      where sc.sector_id = v_sector_budget.sector_id
+      group by sc.sector_id
+    ) sector_spent on sector_spent.sector_id = v_sector_budget.sector_id
+    where sbp.sector_budget_id = v_sector_budget.id
+      and sbp.year = p_from_year_adjusted 
+      and sbp.month = p_from_month;
   end loop;
 end;
 $$; 
