@@ -321,7 +321,11 @@ export function BudgetForm({
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                value={formData.absolute_amount || ""}
+                value={
+                  formData.absolute_amount !== undefined
+                    ? formData.absolute_amount
+                    : ""
+                }
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
@@ -346,7 +350,11 @@ export function BudgetForm({
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value={formData.user1_amount || ""}
+                  value={
+                    formData.user1_amount !== undefined
+                      ? formData.user1_amount
+                      : ""
+                  }
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
@@ -366,7 +374,11 @@ export function BudgetForm({
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value={formData.user2_amount || ""}
+                  value={
+                    formData.user2_amount !== undefined
+                      ? formData.user2_amount
+                      : ""
+                  }
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,

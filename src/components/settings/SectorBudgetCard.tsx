@@ -52,7 +52,10 @@ export function SectorBudgetCard({
   };
 
   const getProgressPercentage = () => {
-    if (!current_period_budget || current_period_budget === 0) return 0;
+    if (!current_period_budget || current_period_budget === 0) {
+      // For zero budgets, show 100% if there's any spending, 0% if no spending
+      return (current_period_spent || 0) > 0 ? 100 : 0;
+    }
     return (
       Math.min((current_period_spent || 0) / current_period_budget, 1) * 100
     );
@@ -60,18 +63,29 @@ export function SectorBudgetCard({
 
   const getProgressColor = () => {
     const percentage = getProgressPercentage();
+    // For zero budgets, any spending should be red
+    if (current_period_budget === 0 && (current_period_spent || 0) > 0)
+      return "bg-red-500";
     if (percentage >= 90) return "bg-red-500";
     if (percentage >= 75) return "bg-yellow-500";
     return "bg-green-500";
   };
 
+  const getRemainingAmount = () => {
+    // For zero budgets, any spending is over budget
+    if (current_period_budget === 0) {
+      return -(current_period_spent || 0);
+    }
+    return current_period_remaining_amount || 0;
+  };
+
   const getRemainingColor = () => {
-    const remaining = current_period_remaining_amount || 0;
+    const remaining = getRemainingAmount();
     return remaining < 0 ? "text-red-600" : "text-green-600";
   };
 
   const isOverBudget = () => {
-    return (current_period_remaining_amount || 0) < 0;
+    return getRemainingAmount() < 0;
   };
 
   const isOverCategoryBudgets = () => {
@@ -147,36 +161,37 @@ export function SectorBudgetCard({
         )}
 
         {/* Progress Bar */}
-        {current_period_budget && current_period_budget > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">
-                ${current_period_spent?.toFixed(2) || "0.00"} / $
-                {current_period_budget.toFixed(2)}
-              </span>
-            </div>
-            <Progress value={getProgressPercentage()} className="h-2" />
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {getProgressPercentage().toFixed(1)}% used
-              </span>
-              <div
-                className={`flex items-center space-x-1 ${getRemainingColor()}`}
-              >
-                {isOverBudget() ? (
-                  <AlertTriangle className="h-3 w-3" />
-                ) : (
-                  <TrendingUp className="h-3 w-3" />
-                )}
-                <span>
-                  ${Math.abs(current_period_remaining_amount || 0).toFixed(2)}{" "}
-                  {isOverBudget() ? "over" : "remaining"}
+        {current_period_budget !== undefined &&
+          current_period_budget !== null && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-medium">
+                  ${current_period_spent?.toFixed(2) || "0.00"} / $
+                  {current_period_budget.toFixed(2)}
                 </span>
               </div>
+              <Progress value={getProgressPercentage()} className="h-2" />
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {getProgressPercentage().toFixed(1)}% used
+                </span>
+                <div
+                  className={`flex items-center space-x-1 ${getRemainingColor()}`}
+                >
+                  {isOverBudget() ? (
+                    <AlertTriangle className="h-3 w-3" />
+                  ) : (
+                    <TrendingUp className="h-3 w-3" />
+                  )}
+                  <span>
+                    ${Math.abs(getRemainingAmount()).toFixed(2)}{" "}
+                    {isOverBudget() ? "over" : "remaining"}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Split Budget Details */}
         {budget_type === "split" && (

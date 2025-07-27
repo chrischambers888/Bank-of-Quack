@@ -98,7 +98,9 @@ export function BudgetCard({
   } = budgetSummary;
 
   const hasBudget =
-    budget_type && (absolute_amount || (user1_amount && user2_amount));
+    budget_type &&
+    (absolute_amount !== undefined ||
+      (user1_amount !== undefined && user2_amount !== undefined));
   const totalBudget =
     budget_type === "absolute"
       ? absolute_amount || 0
@@ -109,6 +111,9 @@ export function BudgetCard({
       : 0;
 
   const getProgressColor = (percentage: number) => {
+    // For zero budgets, any spending should be red
+    if (totalBudget === 0 && (current_period_spent || 0) > 0)
+      return "bg-red-500";
     if (percentage >= redThreshold) return "bg-red-500";
     if (percentage >= yellowThreshold) return "bg-yellow-500";
     return "bg-green-500";
@@ -252,9 +257,13 @@ export function BudgetCard({
               value={spentPercentage}
               className="h-4"
               backgroundColor={
-                spentPercentage >= redThreshold ? "rgb(239 68 68)" : undefined
+                (totalBudget === 0 && (current_period_spent || 0) > 0) ||
+                spentPercentage >= redThreshold
+                  ? "rgb(239 68 68)"
+                  : undefined
               }
               indicatorColor={
+                (totalBudget === 0 && (current_period_spent || 0) > 0) ||
                 spentPercentage >= redThreshold
                   ? "rgb(239 68 68)"
                   : spentPercentage >= yellowThreshold
@@ -267,6 +276,8 @@ export function BudgetCard({
               <span className="text-muted-foreground">
                 {totalBudget && current_period_spent !== undefined
                   ? `${(100 - spentPercentage).toFixed(1)}% remaining`
+                  : current_period_spent && current_period_spent > 0
+                  ? "100.0% used"
                   : "No spending data"}
               </span>
               <span
@@ -276,7 +287,11 @@ export function BudgetCard({
                 )}
               >
                 {formatCurrency(
-                  totalBudget ? totalBudget - (current_period_spent || 0) : 0
+                  totalBudget === 0
+                    ? -(current_period_spent || 0) // Show negative amount for zero budgets
+                    : totalBudget
+                    ? totalBudget - (current_period_spent || 0)
+                    : 0
                 )}
               </span>
             </div>
@@ -313,8 +328,12 @@ export function BudgetCard({
                         100
                       }%`,
                       backgroundColor:
-                        budget_type === "split" &&
-                        (current_period_user1_spent || 0) >= (user1_amount || 0)
+                        // For zero budgets, any spending should be red
+                        (totalBudget === 0 &&
+                          (current_period_user1_spent || 0) > 0) ||
+                        (budget_type === "split" &&
+                          (current_period_user1_spent || 0) >=
+                            (user1_amount || 0))
                           ? "rgb(239 68 68)"
                           : budget_type === "split" &&
                             (current_period_user1_spent || 0) >=
@@ -337,8 +356,12 @@ export function BudgetCard({
                         100
                       }%`,
                       backgroundColor:
-                        budget_type === "split" &&
-                        (current_period_user2_spent || 0) >= (user2_amount || 0)
+                        // For zero budgets, any spending should be red
+                        (totalBudget === 0 &&
+                          (current_period_user2_spent || 0) > 0) ||
+                        (budget_type === "split" &&
+                          (current_period_user2_spent || 0) >=
+                            (user2_amount || 0))
                           ? "rgb(239 68 68)"
                           : budget_type === "split" &&
                             (current_period_user2_spent || 0) >=
