@@ -2,9 +2,17 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BudgetCard } from "./BudgetCard";
 import { SectorBudgetCard } from "./SectorBudgetCard";
 import { EmptyStateCard } from "./EmptyStateCard";
+import TransactionList from "@/components/TransactionList";
+import { supabase } from "@/supabaseClient";
 import {
   BudgetSummary,
   SectorBudgetSummary,
@@ -26,6 +34,7 @@ import {
   Edit,
   Trash2,
   AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 import {
   Collapsible,
@@ -80,6 +89,11 @@ export function TabbedBudgetDisplay({
     x: number;
     y: number;
   }>({ show: false, message: "", x: 0, y: 0 });
+  const [modalData, setModalData] = useState<{
+    type: "sector" | "category";
+    data: any;
+    transactions: any[];
+  } | null>(null);
 
   const showTooltip = (
     message: string,
@@ -218,6 +232,74 @@ export function TabbedBudgetDisplay({
   const getMonthName = () => {
     const date = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  };
+
+  const openSectorModal = async (sector: Sector) => {
+    const sectorBudget = getSectorBudgetSummary(sector.id);
+    const sectorCategories = getCategoriesForSector(sector);
+    const sectorBudgets = getBudgetSummariesForSector(sector);
+
+    // Fetch transactions for all categories in the sector
+    const { data: transactions } = await supabase
+      .from("transactions")
+      .select("*")
+      .in("category_id", sector.category_ids)
+      .gte(
+        "date",
+        `${selectedMonth.year}-${selectedMonth.month
+          .toString()
+          .padStart(2, "0")}-01`
+      )
+      .lt(
+        "date",
+        `${selectedMonth.year}-${(selectedMonth.month + 1)
+          .toString()
+          .padStart(2, "0")}-01`
+      )
+      .order("date", { ascending: false });
+
+    setModalData({
+      type: "sector",
+      data: {
+        sector,
+        sectorBudget,
+        sectorCategories,
+        sectorBudgets,
+      },
+      transactions: transactions || [],
+    });
+  };
+
+  const openCategoryModal = async (budgetSummary: BudgetSummary) => {
+    const category = categories.find((c) => c.id === budgetSummary.category_id);
+
+    // Fetch transactions for the category
+    const { data: transactions } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("category_id", budgetSummary.category_id)
+      .gte(
+        "date",
+        `${selectedMonth.year}-${selectedMonth.month
+          .toString()
+          .padStart(2, "0")}-01`
+      )
+      .lt(
+        "date",
+        `${selectedMonth.year}-${(selectedMonth.month + 1)
+          .toString()
+          .padStart(2, "0")}-01`
+      )
+      .order("date", { ascending: false });
+
+    setModalData({
+      type: "category",
+      data: {
+        budgetSummary,
+        category,
+      },
+      transactions: transactions || [],
+    });
   };
 
   const getBudgetStats = () => {
@@ -520,6 +602,14 @@ export function TabbedBudgetDisplay({
                                         <AlertTriangle className="h-4 w-4 text-yellow-500" />
                                       </div>
                                     )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:bg-muted/50"
+                                      onClick={() => openSectorModal(sector)}
+                                    >
+                                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
                                   </div>
                                 </td>
                                 <td className="text-right py-3 px-4 font-medium">
@@ -708,6 +798,18 @@ export function TabbedBudgetDisplay({
                                                       budgetSummary.category_name
                                                     }
                                                   </span>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-4 w-4 p-0 hover:bg-muted/50"
+                                                    onClick={() =>
+                                                      openCategoryModal(
+                                                        budgetSummary
+                                                      )
+                                                    }
+                                                  >
+                                                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                                  </Button>
                                                 </div>
                                               </td>
                                               <td className="text-right py-2 px-4 text-sm">
@@ -1143,9 +1245,22 @@ export function TabbedBudgetDisplay({
                                     <ChevronRight className="h-4 w-4" />
                                   )}
                                 </Button>
-                                <div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium break-words leading-tight">
+                                    {sector.name}
+                                  </p>
                                   <div className="flex items-center space-x-1">
-                                    <p className="font-medium">{sector.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {sectorCategories.length} categories
+                                    </p>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openSectorModal(sector)}
+                                      className="h-4 w-4 p-0 hover:bg-muted/50"
+                                    >
+                                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                    </Button>
                                     {getSectorsWithoutBudgets().some(
                                       (s) => s.id === sector.id
                                     ) && (
@@ -1168,9 +1283,6 @@ export function TabbedBudgetDisplay({
                                       </div>
                                     )}
                                   </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {sectorCategories.length} categories
-                                  </p>
                                 </div>
                               </div>
                               <div className="flex items-center space-x-1">
@@ -1377,10 +1489,26 @@ export function TabbedBudgetDisplay({
                                                 <p className="font-medium text-sm">
                                                   {budgetSummary.category_name}
                                                 </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                  {formatCurrency(totalBudget)}{" "}
-                                                  budget
-                                                </p>
+                                                <div className="flex items-center space-x-1">
+                                                  <p className="text-xs text-muted-foreground">
+                                                    {formatCurrency(
+                                                      totalBudget
+                                                    )}{" "}
+                                                    budget
+                                                  </p>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      openCategoryModal(
+                                                        budgetSummary
+                                                      )
+                                                    }
+                                                    className="h-4 w-4 p-0 hover:bg-muted/50"
+                                                  >
+                                                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                                  </Button>
+                                                </div>
                                               </div>
                                             </div>
                                             <div className="flex space-x-1">
@@ -1404,9 +1532,9 @@ export function TabbedBudgetDisplay({
                                                       budgetSummary.user2_amount,
                                                   })
                                                 }
-                                                className="h-6 px-2 text-xs"
+                                                className="h-6 w-6 p-0"
                                               >
-                                                Edit
+                                                <Edit className="h-3 w-3" />
                                               </Button>
                                               <Button
                                                 size="sm"
@@ -1416,9 +1544,9 @@ export function TabbedBudgetDisplay({
                                                     budgetSummary.category_id
                                                   )
                                                 }
-                                                className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                                className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
                                               >
-                                                Delete
+                                                <Trash2 className="h-3 w-3" />
                                               </Button>
                                             </div>
                                           </div>
@@ -2145,6 +2273,57 @@ export function TabbedBudgetDisplay({
           </div>
         );
       })()}
+
+      {/* Budget Details Modal */}
+      {modalData && (
+        <Dialog open={!!modalData} onOpenChange={() => setModalData(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-b from-[#004D40] to-[#26A69A] border-none shadow-2xl text-white [&>button]:absolute [&>button]:right-4 [&>button]:top-4 [&>button]:rounded-sm [&>button]:opacity-70 [&>button]:ring-offset-background [&>button]:transition-opacity [&>button]:hover:opacity-100 [&>button]:focus:outline-none [&>button]:focus:ring-2 [&>button]:focus:ring-ring [&>button]:focus:ring-offset-2 [&>button]:disabled:pointer-events-none [&>button]:data-[state=open]:bg-secondary [&>button]:p-2 [&>button_svg]:h-6 [&>button_svg]:w-6">
+            <DialogHeader className="border-b border-white/20 pb-4 pt-6">
+              <DialogTitle className="text-xl font-semibold text-white">
+                {modalData.type === "sector"
+                  ? `${modalData.data.sector.name} Budget Details`
+                  : `${modalData.data.category?.name} Budget Details`}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6 pt-4">
+              {/* Budget Card */}
+              {modalData.type === "sector" ? (
+                <SectorBudgetCard
+                  sectorBudgetSummary={modalData.data.sectorBudget}
+                  selectedMonth={selectedMonth}
+                  user1AvatarUrl={user1AvatarUrl}
+                  user2AvatarUrl={user2AvatarUrl}
+                  onEdit={onEditSectorBudget}
+                  onDelete={onDeleteSectorBudget}
+                />
+              ) : (
+                <BudgetCard
+                  budgetSummary={modalData.data.budgetSummary}
+                  onEdit={onEditBudget}
+                  onDelete={onDeleteBudget}
+                  user1AvatarUrl={user1AvatarUrl}
+                  user2AvatarUrl={user2AvatarUrl}
+                  selectedMonth={selectedMonth}
+                />
+              )}
+
+              {/* Transactions Section */}
+              <div className="border-t border-white/20 pt-6">
+                <TransactionList
+                  transactions={modalData.transactions}
+                  categories={categories}
+                  userNames={["User 1", "User 2"]} // TODO: Get actual user names
+                  showValues={true}
+                  deleteTransaction={() => {}} // TODO: Add delete functionality
+                  handleSetEditingTransaction={() => {}} // TODO: Add edit functionality
+                  allTransactions={modalData.transactions}
+                  variant="dialog"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
