@@ -330,6 +330,25 @@ export function BudgetsPage() {
     setIsSectorFormOpen(true);
   };
 
+  const getCategoryBudgetsTotalForSector = (sectorId: string) => {
+    return budgetSummaries
+      .filter((budgetSummary) => {
+        // Check if this category belongs to the sector
+        const sector = sectors.find((s) => s.id === sectorId);
+        return (
+          sector && sector.category_ids.includes(budgetSummary.category_id)
+        );
+      })
+      .reduce((total, budgetSummary) => {
+        const budgetAmount =
+          budgetSummary.budget_type === "absolute"
+            ? budgetSummary.absolute_amount || 0
+            : (budgetSummary.user1_amount || 0) +
+              (budgetSummary.user2_amount || 0);
+        return total + budgetAmount;
+      }, 0);
+  };
+
   const handleEditSectorBudget = (sectorBudgetSummary: SectorBudgetSummary) => {
     const sector = sectors.find((s) => s.id === sectorBudgetSummary.sector_id);
     if (sector) {
@@ -828,6 +847,9 @@ export function BudgetsPage() {
               sector={selectedSector}
               existingBudget={editingSectorBudget || undefined}
               selectedMonth={selectedMonth}
+              categoryBudgetsTotal={getCategoryBudgetsTotalForSector(
+                selectedSector.id
+              )}
               onSave={handleSaveSectorBudget}
               onCancel={() => {
                 setIsSectorFormOpen(false);

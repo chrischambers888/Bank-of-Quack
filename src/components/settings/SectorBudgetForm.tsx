@@ -25,6 +25,7 @@ interface SectorBudgetFormProps {
   selectedMonth: SelectedMonth;
   onSave: () => void;
   onCancel: () => void;
+  categoryBudgetsTotal?: number; // Add this to get the sum of category budgets
 }
 
 export function SectorBudgetForm({
@@ -33,6 +34,7 @@ export function SectorBudgetForm({
   selectedMonth,
   onSave,
   onCancel,
+  categoryBudgetsTotal = 0,
 }: SectorBudgetFormProps) {
   const { userNames } = useAppData();
   const [formData, setFormData] = useState<SectorBudgetFormData>({
@@ -69,7 +71,11 @@ export function SectorBudgetForm({
         p_month: selectedMonth.month,
         p_budget_type: formData.budget_type,
         p_absolute_amount:
-          formData.budget_type === "absolute" ? formData.absolute_amount : null,
+          formData.budget_type === "absolute"
+            ? formData.auto_rollup
+              ? categoryBudgetsTotal
+              : formData.absolute_amount
+            : null,
         p_user1_amount:
           formData.budget_type === "split" ? formData.user1_amount : null,
         p_user2_amount:
@@ -81,7 +87,11 @@ export function SectorBudgetForm({
       onSave();
     } catch (error) {
       console.error("Error saving sector budget:", error);
-      alert("Error saving sector budget. Please try again.");
+      if (error instanceof Error) {
+        alert(`Error saving sector budget: ${error.message}`);
+      } else {
+        alert("Error saving sector budget. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -101,6 +111,9 @@ export function SectorBudgetForm({
 
   const getTotalAmount = () => {
     if (formData.budget_type === "absolute") {
+      if (formData.auto_rollup) {
+        return categoryBudgetsTotal;
+      }
       return formData.absolute_amount || 0;
     } else {
       return (formData.user1_amount || 0) + (formData.user2_amount || 0);
@@ -142,16 +155,27 @@ export function SectorBudgetForm({
             type="number"
             step="0.01"
             min="0"
-            value={formData.absolute_amount || ""}
+            value={formData.auto_rollup ? "" : formData.absolute_amount || ""}
             onChange={(e) =>
               setFormData((prev) => ({
                 ...prev,
                 absolute_amount: parseFloat(e.target.value) || 0,
               }))
             }
+            disabled={formData.auto_rollup}
             className="bg-card border-border text-foreground"
-            placeholder="0.00"
+            placeholder={
+              formData.auto_rollup
+                ? "Auto-calculated from category budgets"
+                : "0.00"
+            }
           />
+          {formData.auto_rollup && (
+            <p className="text-xs text-gray-300">
+              Amount will be automatically calculated from category budgets in
+              this sector
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -208,7 +232,12 @@ export function SectorBudgetForm({
             checked={formData.auto_rollup}
             disabled={formData.budget_type === "split"}
             onCheckedChange={(checked) =>
-              setFormData((prev) => ({ ...prev, auto_rollup: checked }))
+              setFormData((prev) => ({
+                ...prev,
+                auto_rollup: checked,
+                // Clear amount when auto-rollup is enabled
+                absolute_amount: checked ? 0 : prev.absolute_amount,
+              }))
             }
           />
         </div>
@@ -238,7 +267,9 @@ export function SectorBudgetForm({
         </Button>
         <Button
           type="submit"
-          disabled={isSubmitting || getTotalAmount() <= 0}
+          disabled={
+            isSubmitting || (!formData.auto_rollup && getTotalAmount() <= 0)
+          }
           className="flex-1"
         >
           {isSubmitting

@@ -11,6 +11,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { SectorBudgetSummary, SelectedMonth } from "@/types";
+import { useAppData } from "@/hooks/useAppData";
 
 interface SectorBudgetCardProps {
   sectorBudgetSummary: SectorBudgetSummary;
@@ -25,6 +26,7 @@ export function SectorBudgetCard({
   onDelete,
   selectedMonth,
 }: SectorBudgetCardProps) {
+  const { userNames } = useAppData();
   const {
     sector_id,
     sector_name,
@@ -73,7 +75,8 @@ export function SectorBudgetCard({
   };
 
   const isOverCategoryBudgets = () => {
-    return getBudgetAmount() < category_budgets_total;
+    // Only check for manual budgets, auto-rollup budgets always match
+    return !auto_rollup && getBudgetAmount() < category_budgets_total;
   };
 
   return (
@@ -126,20 +129,22 @@ export function SectorBudgetCard({
           </div>
         </div>
 
-        {/* Category Budgets Total */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            Category Budgets
-          </span>
-          <div className="text-right">
-            <div className="font-semibold">
-              ${category_budgets_total.toFixed(2)}
+        {/* Category Budgets Total - Only show for manual budgets */}
+        {!auto_rollup && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Category Budgets
+            </span>
+            <div className="text-right">
+              <div className="font-semibold">
+                ${category_budgets_total.toFixed(2)}
+              </div>
+              {isOverCategoryBudgets() && (
+                <div className="text-xs text-red-500">Over sector budget</div>
+              )}
             </div>
-            {isOverCategoryBudgets() && (
-              <div className="text-xs text-red-500">Over sector budget</div>
-            )}
           </div>
-        </div>
+        )}
 
         {/* Progress Bar */}
         {current_period_budget && current_period_budget > 0 && (
@@ -177,13 +182,13 @@ export function SectorBudgetCard({
         {budget_type === "split" && (
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">User 1</span>
+              <span className="text-muted-foreground">{userNames[0]}</span>
               <span className="font-medium">
                 ${user1_amount?.toFixed(2) || "0.00"}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">User 2</span>
+              <span className="text-muted-foreground">{userNames[1]}</span>
               <span className="font-medium">
                 ${user2_amount?.toFixed(2) || "0.00"}
               </span>
