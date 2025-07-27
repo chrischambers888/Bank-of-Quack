@@ -212,6 +212,7 @@ export function BudgetForm({
     const newBudgetAmount = getTotalAmount();
 
     // Find sectors that contain this category and have manual budgets (not auto-rollup)
+    // Only validate against sectors that actually have budget records (sectorBudgets only includes sectors with budgets)
     const relevantSectors = sectorBudgets.filter(
       (sector) =>
         sector.category_ids.includes(category.id) && !sector.auto_rollup
