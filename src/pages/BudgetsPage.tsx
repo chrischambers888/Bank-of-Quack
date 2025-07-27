@@ -58,7 +58,14 @@ import {
   ArrowRight,
   Trash2,
   Building2,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAppData } from "@/hooks/useAppData";
 import { useBudgetMonthNavigation } from "@/hooks/useBudgetMonthNavigation";
@@ -353,15 +360,16 @@ export function BudgetsPage() {
     const sector = sectors.find((s) => s.id === sectorBudgetSummary.sector_id);
     if (sector) {
       setSelectedSector(sector);
+      console.log("Setting editing sector budget:", sectorBudgetSummary);
       setEditingSectorBudget({
         id: sectorBudgetSummary.budget_id!,
         sector_id: sectorBudgetSummary.sector_id,
         year: selectedMonth.year,
         month: selectedMonth.month,
         budget_type: sectorBudgetSummary.budget_type!,
-        absolute_amount: sectorBudgetSummary.absolute_amount,
-        user1_amount: sectorBudgetSummary.user1_amount,
-        user2_amount: sectorBudgetSummary.user2_amount,
+        absolute_amount: sectorBudgetSummary.absolute_amount ?? 0,
+        user1_amount: sectorBudgetSummary.user1_amount ?? 0,
+        user2_amount: sectorBudgetSummary.user2_amount ?? 0,
         auto_rollup: sectorBudgetSummary.auto_rollup,
       });
       setIsSectorFormOpen(true);
@@ -420,34 +428,13 @@ export function BudgetsPage() {
 
     setIsDeletingAllBudgets(true);
     try {
-      // Get all budget IDs for the selected month
-      const { data: budgets, error: fetchError } = await supabase
-        .from("category_budgets")
-        .select("id")
-        .eq("year", selectedMonth.year)
-        .eq("month", selectedMonth.month);
+      // Use the database function to handle bulk deletion properly
+      const { error } = await supabase.rpc("delete_all_budgets_for_month", {
+        p_year: selectedMonth.year,
+        p_month: selectedMonth.month,
+      });
 
-      if (fetchError) throw fetchError;
-
-      if (budgets && budgets.length > 0) {
-        // Delete all budget periods first (due to foreign key constraints)
-        const budgetIds = budgets.map((b) => b.id);
-
-        const { error: deletePeriodsError } = await supabase
-          .from("budget_periods")
-          .delete()
-          .in("category_budget_id", budgetIds);
-
-        if (deletePeriodsError) throw deletePeriodsError;
-
-        // Delete all category budgets
-        const { error: deleteBudgetsError } = await supabase
-          .from("category_budgets")
-          .delete()
-          .in("id", budgetIds);
-
-        if (deleteBudgetsError) throw deleteBudgetsError;
-      }
+      if (error) throw error;
 
       await loadData();
     } catch (error) {
@@ -679,6 +666,40 @@ export function BudgetsPage() {
             >
               <ArrowRight className="h-4 w-4" />
             </Button>
+
+            {/* Actions Dropdown Menu */}
+            {hasBudgetData && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-muted"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleDeleteAllBudgets}
+                    disabled={isDeletingAllBudgets}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    {isDeletingAllBudgets ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Budgets
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </div>
@@ -844,6 +865,7 @@ export function BudgetsPage() {
         >
           <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
             <SectorBudgetForm
+              key={editingSectorBudget?.id || "new"}
               sector={selectedSector}
               existingBudget={editingSectorBudget || undefined}
               selectedMonth={selectedMonth}
@@ -1005,25 +1027,6 @@ export function BudgetsPage() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <Button
-                  onClick={handleDeleteAllBudgets}
-                  disabled={isDeletingAllBudgets}
-                  variant="destructive"
-                  size="sm"
-                  className="text-xs sm:text-sm"
-                >
-                  {isDeletingAllBudgets ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
-                      Deleting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
-                      Delete All Budgets
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
 

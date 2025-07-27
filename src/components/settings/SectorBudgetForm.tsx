@@ -37,32 +37,35 @@ export function SectorBudgetForm({
   categoryBudgetsTotal = 0,
 }: SectorBudgetFormProps) {
   const { userNames } = useAppData();
-  const [formData, setFormData] = useState<SectorBudgetFormData>({
-    sector_id: sector.id,
-    budget_type: "absolute",
-    absolute_amount: 0,
-    user1_amount: 0,
-    user2_amount: 0,
-    auto_rollup: true,
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
+  const [formData, setFormData] = useState<SectorBudgetFormData>(() => {
+    // Initialize with existing budget data if available
     if (existingBudget) {
-      setFormData({
+      return {
         sector_id: existingBudget.sector_id,
         budget_type: existingBudget.budget_type,
-        absolute_amount: existingBudget.absolute_amount || 0,
-        user1_amount: existingBudget.user1_amount || 0,
-        user2_amount: existingBudget.user2_amount || 0,
+        absolute_amount: existingBudget.absolute_amount ?? 0,
+        user1_amount: existingBudget.user1_amount ?? 0,
+        user2_amount: existingBudget.user2_amount ?? 0,
         auto_rollup: existingBudget.auto_rollup,
-      });
+      };
     }
-  }, [existingBudget]);
+    // Default values for new budget
+    return {
+      sector_id: sector.id,
+      budget_type: "absolute",
+      absolute_amount: 0,
+      user1_amount: 0,
+      user2_amount: 0,
+      auto_rollup: true,
+    };
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null); // Clear any previous errors
 
     try {
       const { error } = await supabase.rpc("create_sector_budget_for_month", {
@@ -87,11 +90,36 @@ export function SectorBudgetForm({
       onSave();
     } catch (error) {
       console.error("Error saving sector budget:", error);
+
+      let errorMessage = "Error saving sector budget. Please try again.";
+
       if (error instanceof Error) {
-        alert(`Error saving sector budget: ${error.message}`);
+        errorMessage = error.message;
+      } else if (error && typeof error === "object" && "message" in error) {
+        // Handle Supabase error objects
+        const message = error.message as string;
+
+        // Check for the specific constraint error and format it nicely
+        if (message.includes("Sector budget amount")) {
+          // Extract the actual amounts from the error message
+          const match = message.match(
+            /Sector budget amount \(\$([^)]+)\) cannot be less than the sum of category budgets \(\$([^)]+)\)/
+          );
+          if (match) {
+            const sectorAmount = match[1];
+            const categoryTotal = match[2];
+            errorMessage = `Sector budget amount ($${sectorAmount}) cannot be less than the sum of category budgets ($${categoryTotal}). Please increase the budget amount or enable auto-rollup to automatically match the category budgets total.`;
+          } else {
+            errorMessage = message;
+          }
+        } else {
+          errorMessage = message;
+        }
       } else {
-        alert("Error saving sector budget. Please try again.");
+        errorMessage = String(error);
       }
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,6 +150,30 @@ export function SectorBudgetForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Error Display */}
+      {error && (
+        <div
+          key={error}
+          className="p-3 bg-red-500/10 border border-red-500/20 rounded-md"
+        >
+          <div className="flex items-center space-x-2">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="text-sm text-red-400">{error}</div>
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
         <Label className="text-white">Sector</Label>
         <div className="text-white font-medium">{sector.name}</div>
