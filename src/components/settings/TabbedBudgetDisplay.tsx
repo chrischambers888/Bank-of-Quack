@@ -25,6 +25,7 @@ import {
   Circle,
   Edit,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Collapsible,
@@ -161,6 +162,38 @@ export function TabbedBudgetDisplay({
         unassignedCategories.some((cat) => cat.id === budget.category_id) &&
         budget.budget_id
     );
+  };
+
+  const getOrphanedBudgetSummaries = () => {
+    return budgetSummaries.filter((budget) => {
+      // Find which sector this category belongs to
+      const sector = sectors.find((s) =>
+        s.category_ids.includes(budget.category_id)
+      );
+      if (!sector) return false; // Category not assigned to any sector
+
+      // Check if the sector has a budget
+      const sectorBudget = getSectorBudgetSummary(sector.id);
+      const sectorHasBudget = sectorBudget?.budget_id;
+
+      // Return true if category has budget but sector doesn't
+      return budget.budget_id && !sectorHasBudget;
+    });
+  };
+
+  const getSectorsWithoutBudgets = () => {
+    return sectors.filter((sector) => {
+      const sectorBudget = getSectorBudgetSummary(sector.id);
+      const sectorHasBudget = sectorBudget?.budget_id;
+
+      // Check if any categories in this sector have budgets
+      const sectorCategories = getCategoriesForSector(sector);
+      const sectorBudgets = getBudgetSummariesForSector(sector);
+      const hasCategoryBudgets = sectorBudgets.length > 0;
+
+      // Return true if sector has no budget but has categories with budgets
+      return !sectorHasBudget && hasCategoryBudgets;
+    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -390,6 +423,9 @@ export function TabbedBudgetDisplay({
                         <th className="text-center py-3 px-4 font-semibold">
                           Auto Rollup
                         </th>
+                        <th className="text-center py-3 px-4 font-semibold">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -463,6 +499,27 @@ export function TabbedBudgetDisplay({
                                     <span className="text-xs text-muted-foreground">
                                       ({sectorCategories.length} categories)
                                     </span>
+                                    {getSectorsWithoutBudgets().some(
+                                      (s) => s.id === sector.id
+                                    ) && (
+                                      <div
+                                        onMouseEnter={(e) =>
+                                          showTooltip(
+                                            "Sector has categories with budgets but no sector budget",
+                                            e
+                                          )
+                                        }
+                                        onMouseLeave={hideTooltip}
+                                        onTouchStart={(e) =>
+                                          showTooltip(
+                                            "Sector has categories with budgets but no sector budget",
+                                            e
+                                          )
+                                        }
+                                      >
+                                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="text-right py-3 px-4 font-medium">
@@ -508,19 +565,27 @@ export function TabbedBudgetDisplay({
                                 <td className="text-center py-3 px-4">
                                   {sectorBudget?.budget_id ? (
                                     <div className="flex justify-center">
-                                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                                        <svg
-                                          className="w-3 h-3 text-green-600"
-                                          fill="currentColor"
-                                          viewBox="0 0 20 20"
-                                        >
-                                          <path
-                                            fillRule="evenodd"
-                                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                            clipRule="evenodd"
-                                          />
-                                        </svg>
-                                      </div>
+                                      {sectorBudget.auto_rollup ? (
+                                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                                          <svg
+                                            className="w-3 h-3 text-green-600"
+                                            fill="currentColor"
+                                            viewBox="0 0 20 20"
+                                          >
+                                            <path
+                                              fillRule="evenodd"
+                                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                              clipRule="evenodd"
+                                            />
+                                          </svg>
+                                        </div>
+                                      ) : (
+                                        <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                                          <span className="text-xs font-semibold text-blue-600">
+                                            M
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   ) : (
                                     <div className="flex justify-center">
@@ -529,6 +594,48 @@ export function TabbedBudgetDisplay({
                                       </div>
                                     </div>
                                   )}
+                                </td>
+                                <td className="text-center py-3 px-4">
+                                  <div className="flex justify-center space-x-1">
+                                    {sectorBudget?.budget_id ? (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            onEditSectorBudget(sectorBudget)
+                                          }
+                                          className="h-6 px-2 text-xs"
+                                        >
+                                          <Edit className="h-3 w-3 mr-1" />
+                                          Edit
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            onDeleteSectorBudget(sector.id)
+                                          }
+                                          className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                        >
+                                          <Trash2 className="h-3 w-3 mr-1" />
+                                          Delete
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          onCreateSectorBudget(sector)
+                                        }
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Create
+                                      </Button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
 
@@ -705,7 +812,7 @@ export function TabbedBudgetDisplay({
 
                                     return (
                                       <tr className="bg-muted/20 border-t">
-                                        <td colSpan={6} className="py-4 px-4">
+                                        <td colSpan={7} className="py-4 px-4">
                                           <div className="flex justify-center">
                                             <div className="flex flex-wrap justify-center gap-2">
                                               {unsetCategories.map(
@@ -826,6 +933,9 @@ export function TabbedBudgetDisplay({
                               </td>
                               <td className="text-center py-3 px-4">
                                 {/* Removed action buttons from header */}
+                              </td>
+                              <td className="text-center py-3 px-4">
+                                {/* No actions for unassigned categories header */}
                               </td>
                             </tr>
 
@@ -1034,44 +1144,118 @@ export function TabbedBudgetDisplay({
                                   )}
                                 </Button>
                                 <div>
-                                  <p className="font-medium">{sector.name}</p>
+                                  <div className="flex items-center space-x-1">
+                                    <p className="font-medium">{sector.name}</p>
+                                    {getSectorsWithoutBudgets().some(
+                                      (s) => s.id === sector.id
+                                    ) && (
+                                      <div
+                                        onMouseEnter={(e) =>
+                                          showTooltip(
+                                            "Sector has categories with budgets but no sector budget",
+                                            e
+                                          )
+                                        }
+                                        onMouseLeave={hideTooltip}
+                                        onTouchStart={(e) =>
+                                          showTooltip(
+                                            "Sector has categories with budgets but no sector budget",
+                                            e
+                                          )
+                                        }
+                                      >
+                                        <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                                      </div>
+                                    )}
+                                  </div>
                                   <p className="text-xs text-muted-foreground">
                                     {sectorCategories.length} categories
                                   </p>
                                 </div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 hover:bg-muted/50"
-                                onClick={(e) => {
-                                  console.log("Button clicked!");
-                                  e.stopPropagation();
-                                  showTooltip(
-                                    sectorBudget?.budget_id
-                                      ? "Auto-rolled up budget"
-                                      : "No auto-rolled up budget",
-                                    e
-                                  );
-                                }}
-                                onTouchStart={(e) => {
-                                  console.log("Button touched!");
-                                  e.stopPropagation();
-                                  showTooltip(
-                                    sectorBudget?.budget_id
-                                      ? "Auto-rolled up budget"
-                                      : "No auto-rolled up budget",
-                                    e
-                                  );
-                                }}
-                                onMouseLeave={hideTooltip}
-                              >
+                              <div className="flex items-center space-x-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted/50"
+                                  onClick={(e) => {
+                                    console.log("Button clicked!");
+                                    e.stopPropagation();
+                                    if (sectorBudget?.budget_id) {
+                                      showTooltip(
+                                        sectorBudget.auto_rollup
+                                          ? "Auto-rolled up budget"
+                                          : "Manual budget",
+                                        e
+                                      );
+                                    } else {
+                                      showTooltip("No sector budget", e);
+                                    }
+                                  }}
+                                  onTouchStart={(e) => {
+                                    console.log("Button touched!");
+                                    e.stopPropagation();
+                                    if (sectorBudget?.budget_id) {
+                                      showTooltip(
+                                        sectorBudget.auto_rollup
+                                          ? "Auto-rolled up budget"
+                                          : "Manual budget",
+                                        e
+                                      );
+                                    } else {
+                                      showTooltip("No sector budget", e);
+                                    }
+                                  }}
+                                  onMouseLeave={hideTooltip}
+                                >
+                                  {sectorBudget?.budget_id ? (
+                                    sectorBudget.auto_rollup ? (
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                    ) : (
+                                      <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <span className="text-xs font-semibold text-blue-600">
+                                          M
+                                        </span>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <Circle className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </Button>
                                 {sectorBudget?.budget_id ? (
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        onEditSectorBudget(sectorBudget)
+                                      }
+                                      className="h-6 px-2 text-xs"
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        onDeleteSectorBudget(sector.id)
+                                      }
+                                      className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <Circle className="h-5 w-5 text-gray-400" />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onCreateSectorBudget(sector)}
+                                    className="h-6 px-2 text-xs"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
                                 )}
-                              </Button>
+                              </div>
                             </div>
 
                             {/* Sector Stats */}
@@ -1382,7 +1566,7 @@ export function TabbedBudgetDisplay({
                                 console.log("Unassigned button clicked!");
                                 e.stopPropagation();
                                 showTooltip(
-                                  "No auto-rolled up budget (unassigned categories)",
+                                  "Unassigned categories (no sector)",
                                   e
                                 );
                               }}
@@ -1390,7 +1574,7 @@ export function TabbedBudgetDisplay({
                                 console.log("Unassigned button touched!");
                                 e.stopPropagation();
                                 showTooltip(
-                                  "No auto-rolled up budget (unassigned categories)",
+                                  "Unassigned categories (no sector)",
                                   e
                                 );
                               }}
@@ -1743,6 +1927,224 @@ export function TabbedBudgetDisplay({
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Orphaned Category Budgets Section */}
+      {(() => {
+        const orphanedBudgets = getOrphanedBudgetSummaries();
+        if (orphanedBudgets.length === 0) return null;
+
+        return (
+          <div className="mt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                  <span>Orphaned Category Budgets</span>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  These category budgets exist but their sectors don't have
+                  budgets. Consider creating sector budgets to better manage
+                  these categories.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {/* Desktop Table View */}
+                <div className="hidden lg:block">
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left py-3 px-4 font-semibold">
+                            Category
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold">
+                            Sector
+                          </th>
+                          <th className="text-right py-3 px-4 font-semibold">
+                            Budget
+                          </th>
+                          <th className="text-right py-3 px-4 font-semibold">
+                            Spent
+                          </th>
+                          <th className="text-right py-3 px-4 font-semibold">
+                            Remaining
+                          </th>
+                          <th className="text-center py-3 px-4 font-semibold">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orphanedBudgets.map((budget) => {
+                          const category = categories.find(
+                            (c) => c.id === budget.category_id
+                          );
+                          const sector = sectors.find((s) =>
+                            s.category_ids.includes(budget.category_id)
+                          );
+                          const totalBudget =
+                            budget.budget_type === "absolute"
+                              ? budget.absolute_amount || 0
+                              : (budget.user1_amount || 0) +
+                                (budget.user2_amount || 0);
+                          const spent = budget.current_period_spent || 0;
+                          const remaining = totalBudget - spent;
+
+                          return (
+                            <tr
+                              key={budget.category_id}
+                              className="border-b hover:bg-muted/20"
+                            >
+                              <td className="py-3 px-4">
+                                <div className="flex items-center space-x-2">
+                                  {category?.image_url ? (
+                                    <img
+                                      src={category.image_url}
+                                      alt={category.name}
+                                      className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                                      <DollarSign className="h-3 w-3 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  <span className="font-medium">
+                                    {category?.name}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-muted-foreground">
+                                {sector?.name || "Unknown"}
+                              </td>
+                              <td className="py-3 px-4 text-right font-medium">
+                                ${totalBudget.toFixed(2)}
+                              </td>
+                              <td className="py-3 px-4 text-right text-muted-foreground">
+                                ${spent.toFixed(2)}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span
+                                  className={
+                                    remaining >= 0
+                                      ? "text-green-600 font-medium"
+                                      : "text-red-600 font-medium"
+                                  }
+                                >
+                                  ${remaining.toFixed(2)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {sector && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onCreateSectorBudget(sector)}
+                                    className="h-8 px-3"
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Create Sector Budget
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="lg:hidden space-y-3">
+                  {orphanedBudgets.map((budget) => {
+                    const category = categories.find(
+                      (c) => c.id === budget.category_id
+                    );
+                    const sector = sectors.find((s) =>
+                      s.category_ids.includes(budget.category_id)
+                    );
+                    const totalBudget =
+                      budget.budget_type === "absolute"
+                        ? budget.absolute_amount || 0
+                        : (budget.user1_amount || 0) +
+                          (budget.user2_amount || 0);
+                    const spent = budget.current_period_spent || 0;
+                    const remaining = totalBudget - spent;
+
+                    return (
+                      <div
+                        key={budget.category_id}
+                        className="border rounded-lg p-4"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            {category?.image_url ? (
+                              <img
+                                src={category.image_url}
+                                alt={category.name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium">{category?.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Sector: {sector?.name || "Unknown"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                          <div>
+                            <p className="text-muted-foreground">Budget</p>
+                            <p className="font-medium">
+                              ${totalBudget.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Spent</p>
+                            <p className="text-muted-foreground">
+                              ${spent.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Remaining</p>
+                            <p
+                              className={
+                                remaining >= 0
+                                  ? "text-green-600 font-medium"
+                                  : "text-red-600 font-medium"
+                              }
+                            >
+                              ${remaining.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        {sector && (
+                          <div className="flex justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onCreateSectorBudget(sector)}
+                              className="w-full"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Create Sector Budget
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
     </div>
   );
 }

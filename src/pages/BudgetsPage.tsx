@@ -167,7 +167,8 @@ function MonthYearPicker({
 }
 
 export function BudgetsPage() {
-  const { user1AvatarUrl, user2AvatarUrl, sectors } = useAppData();
+  const { user1AvatarUrl, user2AvatarUrl, sectors, transactions } =
+    useAppData();
   const {
     selectedMonth,
     changeMonth,
@@ -400,6 +401,14 @@ export function BudgetsPage() {
       console.error("Error deleting budget:", error);
       alert("Error deleting budget. Please try again.");
     }
+  };
+
+  const handleDeleteBudgetConfirm = (categoryId: string) => {
+    setDeletingBudgetId(categoryId);
+  };
+
+  const handleDeleteSectorBudgetConfirm = (sectorId: string) => {
+    setDeletingSectorBudgetId(sectorId);
   };
 
   const handleDeleteSectorBudget = async (sectorId: string) => {
@@ -870,9 +879,9 @@ export function BudgetsPage() {
           user1AvatarUrl={user1AvatarUrl}
           user2AvatarUrl={user2AvatarUrl}
           onEditBudget={handleEditBudget}
-          onDeleteBudget={handleDeleteBudget}
+          onDeleteBudget={handleDeleteBudgetConfirm}
           onEditSectorBudget={handleEditSectorBudget}
-          onDeleteSectorBudget={handleDeleteSectorBudget}
+          onDeleteSectorBudget={handleDeleteSectorBudgetConfirm}
           onCreateBudget={handleCreateBudget}
           onCreateSectorBudget={handleCreateSectorBudget}
         />
