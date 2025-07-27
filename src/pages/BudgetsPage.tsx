@@ -35,12 +35,17 @@ import {
 } from "@/components/ui/select";
 import { BudgetForm } from "@/components/settings/BudgetForm";
 import { BudgetCard } from "@/components/settings/BudgetCard";
+import { SectorBudgetForm } from "@/components/settings/SectorBudgetForm";
+import { SectorBudgetCard } from "@/components/settings/SectorBudgetCard";
 import {
   Category,
   BudgetSummary,
   CategoryBudget,
   MonthOption,
   SelectedMonth,
+  Sector,
+  SectorBudget,
+  SectorBudgetSummary,
 } from "@/types";
 import { supabase } from "@/supabaseClient";
 import {
@@ -52,6 +57,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Trash2,
+  Building2,
 } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAppData } from "@/hooks/useAppData";
@@ -153,7 +159,7 @@ function MonthYearPicker({
 }
 
 export function BudgetsPage() {
-  const { user1AvatarUrl, user2AvatarUrl } = useAppData();
+  const { user1AvatarUrl, user2AvatarUrl, sectors } = useAppData();
   const {
     selectedMonth,
     changeMonth,
@@ -163,16 +169,26 @@ export function BudgetsPage() {
   } = useBudgetMonthNavigation();
 
   const [budgetSummaries, setBudgetSummaries] = useState<BudgetSummary[]>([]);
+  const [sectorBudgetSummaries, setSectorBudgetSummaries] = useState<
+    SectorBudgetSummary[]
+  >([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
   );
+  const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [editingBudget, setEditingBudget] = useState<CategoryBudget | null>(
     null
   );
+  const [editingSectorBudget, setEditingSectorBudget] =
+    useState<SectorBudget | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSectorFormOpen, setIsSectorFormOpen] = useState(false);
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
+  const [deletingSectorBudgetId, setDeletingSectorBudgetId] = useState<
+    string | null
+  >(null);
   const [hasBudgetData, setHasBudgetData] = useState(true);
   const [isCarryingForward, setIsCarryingForward] = useState(false);
   const [isCopyingFromMonth, setIsCopyingFromMonth] = useState(false);
@@ -200,6 +216,12 @@ export function BudgetsPage() {
   useEffect(() => {
     loadData();
   }, [selectedMonth]);
+
+  // Debug: Log sectors when they change
+  useEffect(() => {
+    console.log("Sectors from useAppData:", sectors?.length || 0, "sectors");
+    console.log("Sectors data:", sectors);
+  }, [sectors]);
 
   useEffect(() => {
     if (showCopyDialog) {
@@ -250,8 +272,26 @@ export function BudgetsPage() {
 
         if (budgetError) throw budgetError;
         setBudgetSummaries(budgetData || []);
+
+        // Load sector budget summaries for the selected month
+        const { data: sectorBudgetData, error: sectorBudgetError } =
+          await supabase.rpc("get_sector_budget_summary_for_month", {
+            p_year: selectedMonth.year,
+            p_month: selectedMonth.month,
+          });
+
+        if (sectorBudgetError) {
+          console.warn(
+            "Error loading sector budget summaries:",
+            sectorBudgetError
+          );
+          setSectorBudgetSummaries([]);
+        } else {
+          setSectorBudgetSummaries(sectorBudgetData || []);
+        }
       } else {
         setBudgetSummaries([]);
+        setSectorBudgetSummaries([]);
       }
     } catch (error) {
       console.error("Error loading budget data:", error);
@@ -284,6 +324,40 @@ export function BudgetsPage() {
     setEditingBudget(null);
   };
 
+  const handleCreateSectorBudget = (sector: Sector) => {
+    setSelectedSector(sector);
+    setEditingSectorBudget(null);
+    setIsSectorFormOpen(true);
+  };
+
+  const handleEditSectorBudget = (sectorBudgetSummary: SectorBudgetSummary) => {
+    const sector = sectors.find((s) => s.id === sectorBudgetSummary.sector_id);
+    if (sector) {
+      setSelectedSector(sector);
+      setEditingSectorBudget({
+        id: sectorBudgetSummary.budget_id!,
+        sector_id: sectorBudgetSummary.sector_id,
+        year: selectedMonth.year,
+        month: selectedMonth.month,
+        budget_type: sectorBudgetSummary.budget_type!,
+        absolute_amount: sectorBudgetSummary.absolute_amount,
+        user1_amount: sectorBudgetSummary.user1_amount,
+        user2_amount: sectorBudgetSummary.user2_amount,
+        auto_rollup: sectorBudgetSummary.auto_rollup,
+      });
+      setIsSectorFormOpen(true);
+    }
+  };
+
+  const handleSaveSectorBudget = async () => {
+    // Add a small delay to ensure database triggers have time to execute
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await loadData();
+    setIsSectorFormOpen(false);
+    setSelectedSector(null);
+    setEditingSectorBudget(null);
+  };
+
   const handleDeleteBudget = async (categoryId: string) => {
     try {
       const { error } = await supabase.rpc("delete_budget_for_month", {
@@ -297,6 +371,22 @@ export function BudgetsPage() {
     } catch (error) {
       console.error("Error deleting budget:", error);
       alert("Error deleting budget. Please try again.");
+    }
+  };
+
+  const handleDeleteSectorBudget = async (sectorId: string) => {
+    try {
+      const { error } = await supabase.rpc("delete_sector_budget_for_month", {
+        p_sector_id: sectorId,
+        p_year: selectedMonth.year,
+        p_month: selectedMonth.month,
+      });
+
+      if (error) throw error;
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting sector budget:", error);
+      alert("Error deleting sector budget. Please try again.");
     }
   };
 
@@ -727,112 +817,230 @@ export function BudgetsPage() {
         </Dialog>
       )}
 
+      {/* Sector Budget Form Dialog (for editing or after picking a sector) */}
+      {isSectorFormOpen && selectedSector && (
+        <Dialog
+          open={isSectorFormOpen && !!selectedSector}
+          onOpenChange={setIsSectorFormOpen}
+        >
+          <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            <SectorBudgetForm
+              sector={selectedSector}
+              existingBudget={editingSectorBudget || undefined}
+              selectedMonth={selectedMonth}
+              onSave={handleSaveSectorBudget}
+              onCancel={() => {
+                setIsSectorFormOpen(false);
+                setSelectedSector(null);
+                setEditingSectorBudget(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Budget Cards */}
       {hasBudgetData && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-lg sm:text-xl font-semibold">
-              Category Budgets
-            </h2>
-            <div className="flex gap-2 sm:gap-1">
-              <Dialog
-                open={isFormOpen && !selectedCategory}
-                onOpenChange={setIsFormOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    onClick={() => setSelectedCategory(null)}
-                    size="sm"
-                    className="text-xs sm:text-sm"
-                  >
-                    <Plus className="h-4 w-4 mr-1 sm:mr-2" />
-                    Add Budget
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
-                  <DialogHeader>
-                    <DialogTitle>Add New Budget</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                      {categories.map((category) => (
-                        <Button
-                          key={category.id}
-                          variant="outline"
-                          className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
-                          onClick={() => handleCreateBudget(category)}
-                        >
-                          {category.image_url && (
-                            <img
-                              src={category.image_url}
-                              alt={category.name}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          )}
-                          <span className="text-sm">{category.name}</span>
-                        </Button>
-                      ))}
+        <div className="space-y-6">
+          {/* Sector Budgets Section */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Sector Budgets
+              </h2>
+              <div className="flex gap-2 sm:gap-1">
+                <Dialog
+                  open={isSectorFormOpen && !selectedSector}
+                  onOpenChange={setIsSectorFormOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={() => setSelectedSector(null)}
+                      size="sm"
+                      className="text-xs sm:text-sm"
+                    >
+                      <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                      Add Sector Budget
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                    <DialogHeader>
+                      <DialogTitle>Add New Sector Budget</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                        {sectors.length === 0 ? (
+                          <div className="col-span-2 text-center py-8">
+                            <Building2 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground mb-2">
+                              No sectors available
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Run database migrations to create sectors
+                            </p>
+                          </div>
+                        ) : (
+                          sectors.map((sector) => (
+                            <Button
+                              key={sector.id}
+                              variant="outline"
+                              className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
+                              onClick={() => handleCreateSectorBudget(sector)}
+                            >
+                              <Building2 className="h-5 w-5" />
+                              <span className="text-sm">{sector.name}</span>
+                            </Button>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button
-                onClick={handleDeleteAllBudgets}
-                disabled={isDeletingAllBudgets}
-                variant="destructive"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                {isDeletingAllBudgets ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
-                    Delete All Budgets
-                  </>
-                )}
-              </Button>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
+
+            {/* Sector Budget Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sectorBudgetSummaries
+                .filter((sectorBudgetSummary) => sectorBudgetSummary.budget_id) // Only show sectors with actual budgets
+                .map((sectorBudgetSummary) => (
+                  <SectorBudgetCard
+                    key={sectorBudgetSummary.sector_id}
+                    sectorBudgetSummary={sectorBudgetSummary}
+                    onEdit={handleEditSectorBudget}
+                    onDelete={(sectorId) => setDeletingSectorBudgetId(sectorId)}
+                    selectedMonth={selectedMonth}
+                  />
+                ))}
+            </div>
+
+            {/* Empty State for Sector Budgets */}
+            {sectorBudgetSummaries.filter((b) => b.budget_id).length === 0 && (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No sector budgets configured for {selectedMonthName}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create sector budgets to manage spending across categories
+                  </p>
+                  <Button onClick={() => setIsSectorFormOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Sector Budget
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Budget Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {budgetSummaries
-              .filter((budgetSummary) => budgetSummary.budget_id) // Only show categories with actual budgets
-              .map((budgetSummary) => (
-                <BudgetCard
-                  key={budgetSummary.category_id}
-                  budgetSummary={budgetSummary}
-                  onEdit={handleEditBudget}
-                  onDelete={(categoryId) => setDeletingBudgetId(categoryId)}
-                  user1AvatarUrl={user1AvatarUrl}
-                  user2AvatarUrl={user2AvatarUrl}
-                  selectedMonth={selectedMonth}
-                />
-              ))}
-          </div>
-
-          {/* Empty State */}
-          {budgetSummaries.filter((b) => b.budget_id).length === 0 && (
-            <Card className="text-center py-12">
-              <CardContent>
-                <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  No budgets configured for {selectedMonthName}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  Create budgets for your categories to track monthly spending
-                </p>
-                <Button onClick={() => setIsFormOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Budget
+          {/* Category Budgets Section */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold">
+                Category Budgets
+              </h2>
+              <div className="flex gap-2 sm:gap-1">
+                <Dialog
+                  open={isFormOpen && !selectedCategory}
+                  onOpenChange={setIsFormOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={() => setSelectedCategory(null)}
+                      size="sm"
+                      className="text-xs sm:text-sm"
+                    >
+                      <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                      Add Budget
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+                    <DialogHeader>
+                      <DialogTitle>Add New Budget</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                        {categories.map((category) => (
+                          <Button
+                            key={category.id}
+                            variant="outline"
+                            className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
+                            onClick={() => handleCreateBudget(category)}
+                          >
+                            {category.image_url && (
+                              <img
+                                src={category.image_url}
+                                alt={category.name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            )}
+                            <span className="text-sm">{category.name}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  onClick={handleDeleteAllBudgets}
+                  disabled={isDeletingAllBudgets}
+                  variant="destructive"
+                  size="sm"
+                  className="text-xs sm:text-sm"
+                >
+                  {isDeletingAllBudgets ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
+                      Delete All Budgets
+                    </>
+                  )}
                 </Button>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </div>
+
+            {/* Budget Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {budgetSummaries
+                .filter((budgetSummary) => budgetSummary.budget_id) // Only show categories with actual budgets
+                .map((budgetSummary) => (
+                  <BudgetCard
+                    key={budgetSummary.category_id}
+                    budgetSummary={budgetSummary}
+                    onEdit={handleEditBudget}
+                    onDelete={(categoryId) => setDeletingBudgetId(categoryId)}
+                    user1AvatarUrl={user1AvatarUrl}
+                    user2AvatarUrl={user2AvatarUrl}
+                    selectedMonth={selectedMonth}
+                  />
+                ))}
+            </div>
+
+            {/* Empty State */}
+            {budgetSummaries.filter((b) => b.budget_id).length === 0 && (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No budgets configured for {selectedMonthName}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create budgets for your categories to track monthly spending
+                  </p>
+                  <Button onClick={() => setIsFormOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Budget
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )}
 
@@ -983,6 +1191,39 @@ export function BudgetsPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               Delete Budget for {selectedMonthName}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Sector Budget Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deletingSectorBudgetId}
+        onOpenChange={() => setDeletingSectorBudgetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete Sector Budget for {selectedMonthName}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this sector budget for{" "}
+              {selectedMonthName}? This will only remove the sector budget for
+              this specific month and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingSectorBudgetId) {
+                  handleDeleteSectorBudget(deletingSectorBudgetId);
+                  setDeletingSectorBudgetId(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Sector Budget for {selectedMonthName}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

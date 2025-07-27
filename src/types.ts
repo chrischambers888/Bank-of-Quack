@@ -43,9 +43,36 @@ export interface CategoryBudget {
   user2_amount?: number;
 }
 
+export interface SectorBudget {
+  id: string;
+  sector_id: string;
+  year: number;
+  month: number;
+  created_at?: string;
+  updated_at?: string;
+  budget_type: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+  auto_rollup: boolean;
+}
+
 export interface BudgetPeriod {
   id: string;
   category_budget_id: string;
+  year: number;
+  month: number;
+  created_at?: string;
+  updated_at?: string;
+  budget_amount: number;
+  spent_amount: number;
+  user1_spent: number;
+  user2_spent: number;
+}
+
+export interface SectorBudgetPeriod {
+  id: string;
+  sector_budget_id: string;
   year: number;
   month: number;
   created_at?: string;
@@ -90,12 +117,39 @@ export interface BudgetSummary {
   current_period_remaining_amount?: number;
 }
 
+export interface SectorBudgetSummary {
+  sector_id: string;
+  sector_name: string;
+  budget_id?: string;
+  budget_type?: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+  auto_rollup: boolean;
+  current_period_budget?: number;
+  current_period_spent?: number;
+  current_period_user1_spent?: number;
+  current_period_user2_spent?: number;
+  current_period_remaining_percentage?: number;
+  current_period_remaining_amount?: number;
+  category_budgets_total: number;
+}
+
 export interface BudgetFormData {
   category_id: string;
   budget_type: 'absolute' | 'split';
   absolute_amount?: number;
   user1_amount?: number;
   user2_amount?: number;
+}
+
+export interface SectorBudgetFormData {
+  sector_id: string;
+  budget_type: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+  auto_rollup: boolean;
 }
 
 // Month navigation types

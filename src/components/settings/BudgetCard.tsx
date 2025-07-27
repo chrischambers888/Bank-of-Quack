@@ -207,6 +207,8 @@ export function BudgetCard({
                 onEdit({
                   id: budgetSummary.budget_id!,
                   category_id: budgetSummary.category_id,
+                  year: selectedMonth?.year || new Date().getFullYear(),
+                  month: selectedMonth?.month || new Date().getMonth() + 1,
                   budget_type: budget_type!,
                   absolute_amount,
                   user1_amount,
