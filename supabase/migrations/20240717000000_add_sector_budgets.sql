@@ -34,7 +34,7 @@ create table if not exists public.sector_budget_periods (
 
 -- Enable RLS on new tables
 alter table public.sector_budgets enable row level security;
-alter table public.sector_budgets_periods enable row level security;
+alter table public.sector_budget_periods enable row level security;
 
 -- Create policies for sector_budgets
 create policy sector_budgets_all on public.sector_budgets
