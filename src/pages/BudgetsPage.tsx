@@ -453,7 +453,36 @@ export function BudgetsPage() {
   const handleCarryForwardBudgets = async () => {
     setIsCarryingForward(true);
     try {
+      // Step 1: Copy category budgets (this will auto-create sector budgets)
       await carryForwardBudgets(selectedMonth.year, selectedMonth.month);
+
+      // Step 2: Delete auto-created sector budgets
+      const { error: deleteError } = await supabase.rpc(
+        "delete_all_sector_budgets_for_month",
+        {
+          p_year: selectedMonth.year,
+          p_month: selectedMonth.month,
+        }
+      );
+      if (deleteError) throw deleteError;
+
+      // Step 3: Copy sector budgets from previous month
+      const { error: copySectorError } = await supabase.rpc(
+        "copy_sector_budgets_from_month",
+        {
+          p_from_year: selectedMonth.year,
+          p_from_month:
+            selectedMonth.month - 1 === 0 ? 12 : selectedMonth.month - 1,
+          p_from_year_adjusted:
+            selectedMonth.month - 1 === 0
+              ? selectedMonth.year - 1
+              : selectedMonth.year,
+          p_to_year: selectedMonth.year,
+          p_to_month: selectedMonth.month,
+        }
+      );
+      if (copySectorError) throw copySectorError;
+
       await loadData();
     } catch (error) {
       console.error("Error carrying forward budgets:", error);
@@ -470,13 +499,41 @@ export function BudgetsPage() {
   const handleCopyFromMonth = async () => {
     setIsCopyingFromMonth(true);
     try {
-      const { error } = await supabase.rpc("copy_budgets_from_month", {
-        p_from_year: copyFromMonth.year,
-        p_from_month: copyFromMonth.month,
-        p_to_year: selectedMonth.year,
-        p_to_month: selectedMonth.month,
-      });
-      if (error) throw error;
+      // Step 1: Copy category budgets (this will auto-create sector budgets)
+      const { error: copyCategoryError } = await supabase.rpc(
+        "copy_budgets_from_month",
+        {
+          p_from_year: copyFromMonth.year,
+          p_from_month: copyFromMonth.month,
+          p_to_year: selectedMonth.year,
+          p_to_month: selectedMonth.month,
+        }
+      );
+      if (copyCategoryError) throw copyCategoryError;
+
+      // Step 2: Delete auto-created sector budgets
+      const { error: deleteError } = await supabase.rpc(
+        "delete_all_sector_budgets_for_month",
+        {
+          p_year: selectedMonth.year,
+          p_month: selectedMonth.month,
+        }
+      );
+      if (deleteError) throw deleteError;
+
+      // Step 3: Copy sector budgets from source month
+      const { error: copySectorError } = await supabase.rpc(
+        "copy_sector_budgets_from_month",
+        {
+          p_from_year: copyFromMonth.year,
+          p_from_month: copyFromMonth.month,
+          p_from_year_adjusted: copyFromMonth.year,
+          p_to_year: selectedMonth.year,
+          p_to_month: selectedMonth.month,
+        }
+      );
+      if (copySectorError) throw copySectorError;
+
       await loadData();
       setShowCopyDialog(false);
     } catch (error) {
@@ -548,19 +605,58 @@ export function BudgetsPage() {
       selectedMonth.month > new Date().getMonth() + 1);
 
   const getBudgetStats = () => {
-    const activeBudgets = budgetSummaries.filter((b) => b.budget_id); // Only consider budgets that actually exist
-    const totalBudget = activeBudgets.reduce((sum, b) => {
-      const budget =
-        b.budget_type === "absolute"
-          ? b.absolute_amount
-          : (b.user1_amount || 0) + (b.user2_amount || 0);
-      return sum + (budget || 0);
+    // Calculate sector budgets total
+    const sectorBudgetsTotal = sectorBudgetSummaries.reduce(
+      (sum, sectorBudget) => {
+        const budget =
+          sectorBudget.budget_type === "absolute"
+            ? sectorBudget.absolute_amount || 0
+            : (sectorBudget.user1_amount || 0) +
+              (sectorBudget.user2_amount || 0);
+        return sum + budget;
+      },
+      0
+    );
+
+    // Calculate category budgets total (only for categories without sector budgets)
+    const categoriesWithSectors = new Set();
+    sectors?.forEach((sector) => {
+      sector.category_ids?.forEach((categoryId) => {
+        categoriesWithSectors.add(categoryId);
+      });
+    });
+
+    const activeCategoryBudgets = budgetSummaries.filter((b) => b.budget_id);
+    const categoryBudgetsTotal = activeCategoryBudgets.reduce((sum, budget) => {
+      // Only include category budgets for categories that don't have a sector budget
+      if (categoriesWithSectors.has(budget.category_id)) {
+        return sum; // Skip this category budget as it's covered by sector budget
+      }
+
+      const budgetAmount =
+        budget.budget_type === "absolute"
+          ? budget.absolute_amount || 0
+          : (budget.user1_amount || 0) + (budget.user2_amount || 0);
+      return sum + budgetAmount;
     }, 0);
 
-    const totalSpent = activeBudgets.reduce(
+    // Total budget is sector budgets + category budgets (for categories without sectors)
+    const totalBudget = sectorBudgetsTotal + categoryBudgetsTotal;
+
+    // Calculate total spent (from both sector and category budgets)
+    const sectorSpent = sectorBudgetSummaries.reduce(
       (sum, b) => sum + (b.current_period_spent || 0),
       0
     );
+    const categorySpent = activeCategoryBudgets.reduce((sum, budget) => {
+      // Only include category spending for categories that don't have a sector budget
+      if (categoriesWithSectors.has(budget.category_id)) {
+        return sum; // Skip this category spending as it's covered by sector spending
+      }
+      return sum + (budget.current_period_spent || 0);
+    }, 0);
+    const totalSpent = sectorSpent + categorySpent;
+
     const totalRemaining = totalBudget - totalSpent;
     const overallPercentage =
       totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
