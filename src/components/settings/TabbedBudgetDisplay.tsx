@@ -649,9 +649,22 @@ export function TabbedBudgetDisplay({
                                                     size="sm"
                                                     variant="ghost"
                                                     onClick={() =>
-                                                      onEditBudget(
-                                                        budgetSummary
-                                                      )
+                                                      onEditBudget({
+                                                        id: budgetSummary.budget_id!,
+                                                        category_id:
+                                                          budgetSummary.category_id,
+                                                        year: selectedMonth.year,
+                                                        month:
+                                                          selectedMonth.month,
+                                                        budget_type:
+                                                          budgetSummary.budget_type!,
+                                                        absolute_amount:
+                                                          budgetSummary.absolute_amount,
+                                                        user1_amount:
+                                                          budgetSummary.user1_amount,
+                                                        user2_amount:
+                                                          budgetSummary.user2_amount,
+                                                      })
                                                     }
                                                     className="h-6 px-2 text-xs"
                                                   >
@@ -1191,7 +1204,21 @@ export function TabbedBudgetDisplay({
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() =>
-                                                  onEditBudget(budgetSummary)
+                                                  onEditBudget({
+                                                    id: budgetSummary.budget_id!,
+                                                    category_id:
+                                                      budgetSummary.category_id,
+                                                    year: selectedMonth.year,
+                                                    month: selectedMonth.month,
+                                                    budget_type:
+                                                      budgetSummary.budget_type!,
+                                                    absolute_amount:
+                                                      budgetSummary.absolute_amount,
+                                                    user1_amount:
+                                                      budgetSummary.user1_amount,
+                                                    user2_amount:
+                                                      budgetSummary.user2_amount,
+                                                  })
                                                 }
                                                 className="h-6 px-2 text-xs"
                                               >
