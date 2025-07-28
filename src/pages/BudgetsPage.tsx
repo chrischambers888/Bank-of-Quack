@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -167,8 +168,14 @@ function MonthYearPicker({
 }
 
 export function BudgetsPage() {
-  const { user1AvatarUrl, user2AvatarUrl, sectors, transactions } =
-    useAppData();
+  const {
+    user1AvatarUrl,
+    user2AvatarUrl,
+    sectors,
+    transactions,
+    userNames,
+    deleteTransaction,
+  } = useAppData();
   const {
     selectedMonth,
     changeMonth,
@@ -176,6 +183,28 @@ export function BudgetsPage() {
     carryForwardBudgets,
     checkMonthHasData,
   } = useBudgetMonthNavigation();
+
+  // Get the App context properly like DashboardPage does
+  const appContext = useOutletContext<any>();
+  // Create a simple handleSetEditingTransaction function that navigates to edit URL
+  const handleSetEditingTransaction = (transaction: any) => {
+    // Navigate to the edit URL with the transaction ID
+    window.location.href = `/transactions/${transaction.id}`;
+  };
+
+  // Create a custom deleteTransaction function that refreshes budget data
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      await deleteTransaction(id);
+      // Refresh budget data after transaction deletion
+      // Use setTimeout to avoid potential state conflicts
+      setTimeout(async () => {
+        await loadData();
+      }, 100);
+    } catch (error) {
+      console.error("Error in handleDeleteTransaction:", error);
+    }
+  };
 
   const [budgetSummaries, setBudgetSummaries] = useState<BudgetSummary[]>([]);
   const [sectorBudgetSummaries, setSectorBudgetSummaries] = useState<
@@ -884,6 +913,9 @@ export function BudgetsPage() {
           onDeleteSectorBudget={handleDeleteSectorBudgetConfirm}
           onCreateBudget={handleCreateBudget}
           onCreateSectorBudget={handleCreateSectorBudget}
+          userNames={userNames}
+          deleteTransaction={handleDeleteTransaction}
+          handleSetEditingTransaction={handleSetEditingTransaction}
         />
       )}
 

@@ -394,6 +394,13 @@ const SectorCategoryPieChart: React.FC<SectorCategoryPieChartProps> = ({
   const [sheetTransactions, setSheetTransactions] = useState<Transaction[]>([]);
   const [sheetTitle, setSheetTitle] = useState("");
 
+  // Create a custom deleteTransaction function that updates sheetTransactions
+  const handleDeleteTransaction = async (id: string) => {
+    await deleteTransaction(id);
+    // Remove the deleted transaction from sheetTransactions
+    setSheetTransactions((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const handleBreakdownClick = (
     type: "sector" | "category",
     id: string,
@@ -605,7 +612,7 @@ const SectorCategoryPieChart: React.FC<SectorCategoryPieChartProps> = ({
               transactions={sheetTransactions}
               categories={categories}
               userNames={userNames}
-              deleteTransaction={deleteTransaction}
+              deleteTransaction={handleDeleteTransaction}
               showValues={showValues}
               incomeImageUrl={incomeImageUrl}
               settlementImageUrl={settlementImageUrl}

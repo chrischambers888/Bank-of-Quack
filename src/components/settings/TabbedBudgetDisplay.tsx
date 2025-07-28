@@ -63,6 +63,9 @@ interface TabbedBudgetDisplayProps {
   onDeleteSectorBudget: (sectorId: string) => void;
   onCreateBudget: (category: Category) => void;
   onCreateSectorBudget: (sector: Sector) => void;
+  userNames: string[];
+  deleteTransaction: (id: string) => Promise<void>;
+  handleSetEditingTransaction: (transaction: any) => void;
 }
 
 export function TabbedBudgetDisplay({
@@ -79,6 +82,9 @@ export function TabbedBudgetDisplay({
   onDeleteSectorBudget,
   onCreateBudget,
   onCreateSectorBudget,
+  userNames,
+  deleteTransaction,
+  handleSetEditingTransaction,
 }: TabbedBudgetDisplayProps) {
   const { yellowThreshold, redThreshold } = useBudgetSettings();
   const [activeTab, setActiveTab] = useState("overview");
@@ -302,6 +308,73 @@ export function TabbedBudgetDisplay({
       },
       transactions: transactions || [],
     });
+  };
+
+  // Function to refresh transactions in the modal
+  const refreshModalTransactions = async () => {
+    if (!modalData) return;
+
+    if (modalData.type === "sector") {
+      const sector = modalData.data.sector;
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .in("category_id", sector.category_ids)
+        .gte(
+          "date",
+          `${selectedMonth.year}-${selectedMonth.month
+            .toString()
+            .padStart(2, "0")}-01`
+        )
+        .lt(
+          "date",
+          `${selectedMonth.year}-${(selectedMonth.month + 1)
+            .toString()
+            .padStart(2, "0")}-01`
+        )
+        .order("date", { ascending: false });
+
+      setModalData({
+        ...modalData,
+        transactions: transactions || [],
+      });
+    } else {
+      const budgetSummary = modalData.data.budgetSummary;
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("category_id", budgetSummary.category_id)
+        .gte(
+          "date",
+          `${selectedMonth.year}-${selectedMonth.month
+            .toString()
+            .padStart(2, "0")}-01`
+        )
+        .lt(
+          "date",
+          `${selectedMonth.year}-${(selectedMonth.month + 1)
+            .toString()
+            .padStart(2, "0")}-01`
+        )
+        .order("date", { ascending: false });
+
+      setModalData({
+        ...modalData,
+        transactions: transactions || [],
+      });
+    }
+  };
+
+  // Custom delete function that refreshes the modal
+  const handleDeleteTransaction = async (id: string) => {
+    console.log(
+      "TabbedBudgetDisplay handleDeleteTransaction called with id:",
+      id
+    );
+    await deleteTransaction(id);
+    // The parent's deleteTransaction should handle refreshing the budget data
+    // We just need to refresh the modal transactions
+    await refreshModalTransactions();
   };
 
   const getBudgetStats = () => {
@@ -888,7 +961,7 @@ export function TabbedBudgetDisplay({
                                                     size="sm"
                                                     variant="ghost"
                                                     onClick={() =>
-                                                      onDeleteBudget(
+                                                      handleDeleteTransaction(
                                                         budgetSummary.category_id
                                                       )
                                                     }
@@ -1157,7 +1230,7 @@ export function TabbedBudgetDisplay({
                                           size="sm"
                                           variant="ghost"
                                           onClick={() =>
-                                            onDeleteBudget(
+                                            handleDeleteTransaction(
                                               budgetSummary.category_id
                                             )
                                           }
@@ -1545,7 +1618,7 @@ export function TabbedBudgetDisplay({
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() =>
-                                                  onDeleteBudget(
+                                                  handleDeleteTransaction(
                                                     budgetSummary.category_id
                                                   )
                                                 }
@@ -2318,10 +2391,14 @@ export function TabbedBudgetDisplay({
                 <TransactionList
                   transactions={modalData.transactions}
                   categories={categories}
-                  userNames={["User 1", "User 2"]} // TODO: Get actual user names
+                  userNames={userNames}
                   showValues={true}
-                  deleteTransaction={() => {}} // TODO: Add delete functionality
-                  handleSetEditingTransaction={() => {}} // TODO: Add edit functionality
+                  deleteTransaction={handleDeleteTransaction}
+                  handleSetEditingTransaction={(transaction) => {
+                    handleSetEditingTransaction(transaction);
+                    setModalData(null); // Close the modal
+                    // The navigation will be handled by the handleSetEditingTransaction function
+                  }}
                   allTransactions={modalData.transactions}
                   variant="dialog"
                 />

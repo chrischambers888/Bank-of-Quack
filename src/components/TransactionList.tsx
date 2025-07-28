@@ -85,8 +85,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
   const onEdit = (transaction: Transaction) => {
     if (handleSetEditingTransaction) {
       handleSetEditingTransaction(transaction);
+      // The navigation will be handled by the handleSetEditingTransaction function
+    } else {
+      // If no handleSetEditingTransaction is provided, just navigate (for backward compatibility)
+      if (variant !== "dialog") {
+        navigate("/transactions");
+      }
+      // In dialog mode without handleSetEditingTransaction, do nothing (like ImportDialog)
     }
-    navigate("/transactions");
   };
 
   const handleDeleteRequest = (transactionId: string) => {

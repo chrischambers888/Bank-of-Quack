@@ -40,7 +40,6 @@ interface DashboardPageContext {
   deleteTransaction: (id: string) => Promise<void>;
   user1AvatarUrl?: string | null;
   user2AvatarUrl?: string | null;
-  handleSetEditingTransaction: (transaction: Transaction) => void;
   fabOpen: boolean;
 }
 
@@ -57,9 +56,14 @@ const DashboardPage: React.FC = () => {
     deleteTransaction,
     user1AvatarUrl,
     user2AvatarUrl,
-    handleSetEditingTransaction,
     fabOpen,
   } = useOutletContext<DashboardPageContext>();
+
+  // Create a custom handleSetEditingTransaction function that uses URL-based approach
+  const handleSetEditingTransaction = (transaction: Transaction) => {
+    // Navigate to the edit URL with the transaction ID
+    window.location.href = `/transactions/${transaction.id}`;
+  };
 
   useEffect(() => {
     // Set the value once on mount and don't update on resize.

@@ -35,6 +35,10 @@ const router = createBrowserRouter([
         element: <TransactionsPage />,
       },
       {
+        path: "transactions/:transactionId", // Corresponds to '/transactions/:id' for editing
+        element: <TransactionsPage />,
+      },
+      {
         path: "settings", // Corresponds to '/settings'
         element: <SettingsPage />,
       },

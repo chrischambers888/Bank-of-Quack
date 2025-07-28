@@ -1,6 +1,6 @@
 // src/pages/TransactionsPage.tsx
 import React from "react"; // Added React import for clarity, though often implicit
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useParams } from "react-router-dom";
 import TransactionForm from "../components/TransactionForm";
 import DuckFabNav from "@/components/dashboard/DuckFabNav";
 import { Transaction, Category } from "@/types";
@@ -20,6 +20,44 @@ interface TransactionsPageContext {
 const TransactionsPage: React.FC = () => {
   // Get the full context from Outlet
   const context = useOutletContext<TransactionsPageContext>();
+  const { transactionId } = useParams<{ transactionId?: string }>();
+
+  // Set the editing transaction based on URL parameter
+  React.useEffect(() => {
+    if (
+      transactionId &&
+      context.transactions &&
+      context.handleSetEditingTransaction
+    ) {
+      const transaction = context.transactions.find(
+        (t) => t.id === transactionId
+      );
+      if (transaction) {
+        context.handleSetEditingTransaction(transaction);
+      }
+    }
+  }, [
+    transactionId,
+    context.transactions,
+    context.handleSetEditingTransaction,
+  ]);
+
+  // Simple fallback to check localStorage if editingTransaction is not in context
+  React.useEffect(() => {
+    if (!context.editingTransaction && context.handleSetEditingTransaction) {
+      const storedTransaction = localStorage.getItem("editingTransaction");
+      if (storedTransaction) {
+        try {
+          const transaction = JSON.parse(storedTransaction);
+          context.handleSetEditingTransaction(transaction);
+          localStorage.removeItem("editingTransaction"); // Clean up
+        } catch (error) {
+          console.error("Error parsing stored transaction:", error);
+          localStorage.removeItem("editingTransaction"); // Clean up invalid data
+        }
+      }
+    }
+  }, [context.editingTransaction, context.handleSetEditingTransaction]);
 
   return (
     <>
