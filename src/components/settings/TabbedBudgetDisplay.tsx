@@ -13,6 +13,7 @@ import { SectorBudgetCard } from "./SectorBudgetCard";
 import { EmptyStateCard } from "./EmptyStateCard";
 import TransactionList from "@/components/TransactionList";
 import { supabase } from "@/supabaseClient";
+import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import {
   BudgetSummary,
   SectorBudgetSummary,
@@ -79,6 +80,7 @@ export function TabbedBudgetDisplay({
   onCreateBudget,
   onCreateSectorBudget,
 }: TabbedBudgetDisplayProps) {
+  const { yellowThreshold, redThreshold } = useBudgetSettings();
   const [activeTab, setActiveTab] = useState("overview");
   const [expandedSectors, setExpandedSectors] = useState<Set<string>>(
     new Set()
@@ -633,9 +635,10 @@ export function TabbedBudgetDisplay({
                                     <div className="w-16 bg-gray-200 rounded-full h-2">
                                       <div
                                         className={`h-2 rounded-full transition-all duration-300 ${
-                                          sectorPercentage > 100
+                                          sectorPercentage >= redThreshold
                                             ? "bg-red-500"
-                                            : sectorPercentage > 80
+                                            : sectorPercentage >=
+                                              yellowThreshold
                                             ? "bg-yellow-500"
                                             : "bg-green-500"
                                         }`}
@@ -833,9 +836,11 @@ export function TabbedBudgetDisplay({
                                                   <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                                     <div
                                                       className={`h-1.5 rounded-full transition-all duration-300 ${
-                                                        percentage > 100
+                                                        percentage >=
+                                                        redThreshold
                                                           ? "bg-red-500"
-                                                          : percentage > 80
+                                                          : percentage >=
+                                                            yellowThreshold
                                                           ? "bg-yellow-500"
                                                           : "bg-green-500"
                                                       }`}
@@ -1014,9 +1019,9 @@ export function TabbedBudgetDisplay({
                                   <div className="w-16 bg-gray-200 rounded-full h-2">
                                     <div
                                       className={`h-2 rounded-full transition-all duration-300 ${
-                                        totalPercentage > 100
+                                        totalPercentage >= redThreshold
                                           ? "bg-red-500"
-                                          : totalPercentage > 80
+                                          : totalPercentage >= yellowThreshold
                                           ? "bg-yellow-500"
                                           : "bg-green-500"
                                       }`}
@@ -1117,9 +1122,9 @@ export function TabbedBudgetDisplay({
                                         <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                           <div
                                             className={`h-1.5 rounded-full transition-all duration-300 ${
-                                              percentage > 100
+                                              percentage >= redThreshold
                                                 ? "bg-red-500"
-                                                : percentage > 80
+                                                : percentage >= yellowThreshold
                                                 ? "bg-yellow-500"
                                                 : "bg-green-500"
                                             }`}
@@ -1410,9 +1415,9 @@ export function TabbedBudgetDisplay({
                               <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                   className={`h-2 rounded-full transition-all duration-300 ${
-                                    sectorPercentage > 100
+                                    sectorPercentage >= redThreshold
                                       ? "bg-red-500"
-                                      : sectorPercentage > 80
+                                      : sectorPercentage >= yellowThreshold
                                       ? "bg-yellow-500"
                                       : "bg-green-500"
                                   }`}
@@ -1585,9 +1590,10 @@ export function TabbedBudgetDisplay({
                                             <div className="w-full bg-gray-200 rounded-full h-1.5">
                                               <div
                                                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                                                  percentage > 100
+                                                  percentage >= redThreshold
                                                     ? "bg-red-500"
-                                                    : percentage > 80
+                                                    : percentage >=
+                                                      yellowThreshold
                                                     ? "bg-yellow-500"
                                                     : "bg-green-500"
                                                 }`}
@@ -1752,9 +1758,9 @@ export function TabbedBudgetDisplay({
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <div
                                 className={`h-2 rounded-full transition-all duration-300 ${
-                                  totalPercentage > 100
+                                  totalPercentage >= redThreshold
                                     ? "bg-red-500"
-                                    : totalPercentage > 80
+                                    : totalPercentage >= yellowThreshold
                                     ? "bg-yellow-500"
                                     : "bg-green-500"
                                 }`}
@@ -1844,9 +1850,9 @@ export function TabbedBudgetDisplay({
                                         <div className="w-12 bg-gray-200 rounded-full h-1">
                                           <div
                                             className={`h-1 rounded-full transition-all duration-300 ${
-                                              percentage > 100
+                                              percentage >= redThreshold
                                                 ? "bg-red-500"
-                                                : percentage > 80
+                                                : percentage >= yellowThreshold
                                                 ? "bg-yellow-500"
                                                 : "bg-green-500"
                                             }`}
