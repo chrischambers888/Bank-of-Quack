@@ -12,6 +12,7 @@ drop trigger if exists trigger_auto_delete_sector_budget on category_budgets;
 drop trigger if exists trigger_roll_down_sector_budget on category_budgets;
 drop trigger if exists trigger_auto_update_sector_budget on category_budgets;
 drop trigger if exists trigger_auto_recalculate_sector_budget on category_budgets;
+drop trigger if exists trigger_transaction_budget_update on transactions;
 
 -- Drop functions that manage budget_periods and sector_budget_periods (but keep auto-rollup functions)
 drop function if exists public.handle_budget_changes();
