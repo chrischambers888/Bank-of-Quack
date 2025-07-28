@@ -87,7 +87,7 @@ export function TabbedBudgetDisplay({
   handleSetEditingTransaction,
 }: TabbedBudgetDisplayProps) {
   const { yellowThreshold, redThreshold } = useBudgetSettings();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("monthly");
   const [expandedSectors, setExpandedSectors] = useState<Set<string>>(
     new Set()
   );
@@ -472,27 +472,19 @@ export function TabbedBudgetDisplay({
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="monthly" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            Overview
+            Monthly
           </TabsTrigger>
-          <TabsTrigger value="sectors" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Sectors
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Categories
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
+          <TabsTrigger value="yearly" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
-            Analytics
+            Yearly
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab - Pivot Table */}
-        <TabsContent value="overview" className="space-y-6">
+        {/* Monthly Tab - Pivot Table */}
+        <TabsContent value="monthly" className="space-y-6">
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
@@ -1954,283 +1946,198 @@ export function TabbedBudgetDisplay({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        {/* Sectors Tab */}
-        <TabsContent value="sectors" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Sector Budgets</h3>
-            <Button
-              size="sm"
-              onClick={() => onCreateSectorBudget(sectors[0])}
-              className="text-xs"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Sector Budget
-            </Button>
-          </div>
+          {/* Orphaned Category Budgets Section */}
+          {(() => {
+            const orphanedBudgets = getOrphanedBudgetSummaries();
+            if (orphanedBudgets.length === 0) return null;
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sectorBudgetSummaries
-              .filter((sectorBudgetSummary) => sectorBudgetSummary.budget_id)
-              .map((sectorBudgetSummary) => (
-                <SectorBudgetCard
-                  key={sectorBudgetSummary.sector_id}
-                  sectorBudgetSummary={sectorBudgetSummary}
-                  onEdit={onEditSectorBudget}
-                  onDelete={onDeleteSectorBudget}
-                  selectedMonth={selectedMonth}
-                  user1AvatarUrl={user1AvatarUrl}
-                  user2AvatarUrl={user2AvatarUrl}
-                />
-              ))}
-          </div>
+            return (
+              <div className="mt-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center space-x-2">
+                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                      <span>Orphaned Category Budgets</span>
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      These category budgets exist but their sectors don't have
+                      budgets. Consider creating sector budgets to better manage
+                      these categories.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Desktop Table View */}
+                    <div className="hidden lg:block">
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left py-3 px-4 font-semibold">
+                                Category
+                              </th>
+                              <th className="text-left py-3 px-4 font-semibold">
+                                Sector
+                              </th>
+                              <th className="text-right py-3 px-4 font-semibold">
+                                Budget
+                              </th>
+                              <th className="text-right py-3 px-4 font-semibold">
+                                Spent
+                              </th>
+                              <th className="text-right py-3 px-4 font-semibold">
+                                Remaining
+                              </th>
+                              <th className="text-center py-3 px-4 font-semibold">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {orphanedBudgets.map((budget) => {
+                              const category = categories.find(
+                                (c) => c.id === budget.category_id
+                              );
+                              const sector = sectors.find((s) =>
+                                s.category_ids.includes(budget.category_id)
+                              );
+                              const totalBudget =
+                                budget.budget_type === "absolute"
+                                  ? budget.absolute_amount || 0
+                                  : (budget.user1_amount || 0) +
+                                    (budget.user2_amount || 0);
+                              const spent = budget.current_period_spent || 0;
+                              const remaining = totalBudget - spent;
 
-          {sectorBudgetSummaries.filter((b) => b.budget_id).length === 0 && (
-            <EmptyStateCard
-              icon={Building2}
-              title="No sector budgets configured"
-              description="Create sector budgets to manage spending across categories"
-              actionText="Create Your First Sector Budget"
-              onAction={() => onCreateSectorBudget(sectors[0])}
-            />
-          )}
-        </TabsContent>
-
-        {/* Categories Tab */}
-        <TabsContent value="categories" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Category Budgets</h3>
-            <Button
-              size="sm"
-              onClick={() => onCreateBudget(categories[0])}
-              className="text-xs"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Category Budget
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {budgetSummaries
-              .filter((budgetSummary) => budgetSummary.budget_id)
-              .map((budgetSummary) => (
-                <BudgetCard
-                  key={budgetSummary.category_id}
-                  budgetSummary={budgetSummary}
-                  onEdit={onEditBudget}
-                  onDelete={onDeleteBudget}
-                  user1AvatarUrl={user1AvatarUrl}
-                  user2AvatarUrl={user2AvatarUrl}
-                  selectedMonth={selectedMonth}
-                />
-              ))}
-          </div>
-
-          {budgetSummaries.filter((b) => b.budget_id).length === 0 && (
-            <EmptyStateCard
-              icon={DollarSign}
-              title="No category budgets configured"
-              description="Create budgets for your categories to track monthly spending"
-              actionText="Create Your First Budget"
-              onAction={() => onCreateBudget(categories[0])}
-            />
-          )}
-        </TabsContent>
-
-        {/* Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Sector Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Sector Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {sectors.map((sector) => {
-                  const sectorBudget = getSectorBudgetSummary(sector.id);
-                  const sectorTotal = calculateSectorTotal(sector);
-                  const sectorSpent = calculateSectorSpent(sector);
-                  const percentage =
-                    sectorTotal > 0 ? (sectorSpent / sectorTotal) * 100 : 0;
-
-                  return (
-                    <div key={sector.id} className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>{sector.name}</span>
-                        <span className="font-medium">
-                          {formatCurrency(sectorTotal)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min(percentage, 100)}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{formatCurrency(sectorSpent)} spent</span>
-                        <span>{percentage.toFixed(1)}%</span>
+                              return (
+                                <tr
+                                  key={budget.category_id}
+                                  className="border-b hover:bg-muted/20"
+                                >
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center space-x-2">
+                                      {category?.image_url ? (
+                                        <img
+                                          src={category.image_url}
+                                          alt={category.name}
+                                          className="w-6 h-6 rounded-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                                        </div>
+                                      )}
+                                      <span className="font-medium">
+                                        {category?.name}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-muted-foreground">
+                                    {sector?.name || "Unknown"}
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-medium">
+                                    ${totalBudget.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right text-muted-foreground">
+                                    ${spent.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span
+                                      className={
+                                        remaining >= 0
+                                          ? "text-green-600 font-medium"
+                                          : "text-red-600 font-medium"
+                                      }
+                                    >
+                                      ${remaining.toFixed(2)}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    {sector && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          onCreateSectorBudget(sector)
+                                        }
+                                        className="h-8 px-3"
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Create Sector Budget
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
 
-            {/* Category Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Category Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {budgetSummaries
-                  .filter((budgetSummary) => budgetSummary.budget_id)
-                  .slice(0, 5) // Show top 5 categories
-                  .map((budgetSummary) => {
-                    const totalBudget =
-                      budgetSummary.budget_type === "absolute"
-                        ? budgetSummary.absolute_amount || 0
-                        : (budgetSummary.user1_amount || 0) +
-                          (budgetSummary.user2_amount || 0);
-                    const percentage =
-                      totalBudget > 0
-                        ? ((budgetSummary.current_period_spent || 0) /
-                            totalBudget) *
-                          100
-                        : 0;
+                    {/* Mobile Card View */}
+                    <div className="lg:hidden space-y-3">
+                      {orphanedBudgets.map((budget) => {
+                        const category = categories.find(
+                          (c) => c.id === budget.category_id
+                        );
+                        const sector = sectors.find((s) =>
+                          s.category_ids.includes(budget.category_id)
+                        );
+                        const totalBudget =
+                          budget.budget_type === "absolute"
+                            ? budget.absolute_amount || 0
+                            : (budget.user1_amount || 0) +
+                              (budget.user2_amount || 0);
+                        const spent = budget.current_period_spent || 0;
+                        const remaining = totalBudget - spent;
 
-                    return (
-                      <div
-                        key={budgetSummary.category_id}
-                        className="space-y-2"
-                      >
-                        <div className="flex justify-between text-sm">
-                          <span>{budgetSummary.category_name}</span>
-                          <span className="font-medium">
-                            {formatCurrency(totalBudget)}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        return (
                           <div
-                            className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(percentage, 100)}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>
-                            {formatCurrency(
-                              budgetSummary.current_period_spent || 0
-                            )}{" "}
-                            spent
-                          </span>
-                          <span>{percentage.toFixed(1)}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Orphaned Category Budgets Section */}
-      {(() => {
-        const orphanedBudgets = getOrphanedBudgetSummaries();
-        if (orphanedBudgets.length === 0) return null;
-
-        return (
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  <span>Orphaned Category Budgets</span>
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  These category budgets exist but their sectors don't have
-                  budgets. Consider creating sector budgets to better manage
-                  these categories.
-                </p>
-              </CardHeader>
-              <CardContent>
-                {/* Desktop Table View */}
-                <div className="hidden lg:block">
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left py-3 px-4 font-semibold">
-                            Category
-                          </th>
-                          <th className="text-left py-3 px-4 font-semibold">
-                            Sector
-                          </th>
-                          <th className="text-right py-3 px-4 font-semibold">
-                            Budget
-                          </th>
-                          <th className="text-right py-3 px-4 font-semibold">
-                            Spent
-                          </th>
-                          <th className="text-right py-3 px-4 font-semibold">
-                            Remaining
-                          </th>
-                          <th className="text-center py-3 px-4 font-semibold">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orphanedBudgets.map((budget) => {
-                          const category = categories.find(
-                            (c) => c.id === budget.category_id
-                          );
-                          const sector = sectors.find((s) =>
-                            s.category_ids.includes(budget.category_id)
-                          );
-                          const totalBudget =
-                            budget.budget_type === "absolute"
-                              ? budget.absolute_amount || 0
-                              : (budget.user1_amount || 0) +
-                                (budget.user2_amount || 0);
-                          const spent = budget.current_period_spent || 0;
-                          const remaining = totalBudget - spent;
-
-                          return (
-                            <tr
-                              key={budget.category_id}
-                              className="border-b hover:bg-muted/20"
-                            >
-                              <td className="py-3 px-4">
-                                <div className="flex items-center space-x-2">
-                                  {category?.image_url ? (
-                                    <img
-                                      src={category.image_url}
-                                      alt={category.name}
-                                      className="w-6 h-6 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                                      <DollarSign className="h-3 w-3 text-muted-foreground" />
-                                    </div>
-                                  )}
-                                  <span className="font-medium">
+                            key={budget.category_id}
+                            className="border rounded-lg p-4"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                {category?.image_url ? (
+                                  <img
+                                    src={category.image_url}
+                                    alt={category.name}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium">
                                     {category?.name}
-                                  </span>
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Sector: {sector?.name || "Unknown"}
+                                  </p>
                                 </div>
-                              </td>
-                              <td className="py-3 px-4 text-muted-foreground">
-                                {sector?.name || "Unknown"}
-                              </td>
-                              <td className="py-3 px-4 text-right font-medium">
-                                ${totalBudget.toFixed(2)}
-                              </td>
-                              <td className="py-3 px-4 text-right text-muted-foreground">
-                                ${spent.toFixed(2)}
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <span
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                              <div>
+                                <p className="text-muted-foreground">Budget</p>
+                                <p className="font-medium">
+                                  ${totalBudget.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Spent</p>
+                                <p className="text-muted-foreground">
+                                  ${spent.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">
+                                  Remaining
+                                </p>
+                                <p
                                   className={
                                     remaining >= 0
                                       ? "text-green-600 font-medium"
@@ -2238,120 +2145,51 @@ export function TabbedBudgetDisplay({
                                   }
                                 >
                                   ${remaining.toFixed(2)}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {sector && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => onCreateSectorBudget(sector)}
-                                    className="h-8 px-3"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Create Sector Budget
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Mobile Card View */}
-                <div className="lg:hidden space-y-3">
-                  {orphanedBudgets.map((budget) => {
-                    const category = categories.find(
-                      (c) => c.id === budget.category_id
-                    );
-                    const sector = sectors.find((s) =>
-                      s.category_ids.includes(budget.category_id)
-                    );
-                    const totalBudget =
-                      budget.budget_type === "absolute"
-                        ? budget.absolute_amount || 0
-                        : (budget.user1_amount || 0) +
-                          (budget.user2_amount || 0);
-                    const spent = budget.current_period_spent || 0;
-                    const remaining = totalBudget - spent;
-
-                    return (
-                      <div
-                        key={budget.category_id}
-                        className="border rounded-lg p-4"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            {category?.image_url ? (
-                              <img
-                                src={category.image_url}
-                                alt={category.name}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                </p>
+                              </div>
+                            </div>
+                            {sector && (
+                              <div className="flex justify-center">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onCreateSectorBudget(sector)}
+                                  className="w-full"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Create Sector Budget
+                                </Button>
                               </div>
                             )}
-                            <div>
-                              <p className="font-medium">{category?.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Sector: {sector?.name || "Unknown"}
-                              </p>
-                            </div>
                           </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-                          <div>
-                            <p className="text-muted-foreground">Budget</p>
-                            <p className="font-medium">
-                              ${totalBudget.toFixed(2)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Spent</p>
-                            <p className="text-muted-foreground">
-                              ${spent.toFixed(2)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Remaining</p>
-                            <p
-                              className={
-                                remaining >= 0
-                                  ? "text-green-600 font-medium"
-                                  : "text-red-600 font-medium"
-                              }
-                            >
-                              ${remaining.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                        {sector && (
-                          <div className="flex justify-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onCreateSectorBudget(sector)}
-                              className="w-full"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Create Sector Budget
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      })()}
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
+        </TabsContent>
+
+        {/* Yearly Tab */}
+        <TabsContent value="yearly" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Yearly Budgets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <PieChart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Coming Soon</h3>
+                <p className="text-muted-foreground">
+                  Yearly budget planning and tracking will be available soon.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Budget Details Modal */}
       {modalData && (
