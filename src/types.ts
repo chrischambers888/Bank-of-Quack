@@ -57,31 +57,7 @@ export interface SectorBudget {
   auto_rollup: boolean;
 }
 
-export interface BudgetPeriod {
-  id: string;
-  category_budget_id: string;
-  year: number;
-  month: number;
-  created_at?: string;
-  updated_at?: string;
-  budget_amount: number;
-  spent_amount: number;
-  user1_spent: number;
-  user2_spent: number;
-}
-
-export interface SectorBudgetPeriod {
-  id: string;
-  sector_budget_id: string;
-  year: number;
-  month: number;
-  created_at?: string;
-  updated_at?: string;
-  budget_amount: number;
-  spent_amount: number;
-  user1_spent: number;
-  user2_spent: number;
-}
+// Budget periods are no longer stored in the database - spent amounts are calculated dynamically from transaction data
 
 export interface TransactionWithBudget extends Transaction {
   budget_id?: string;
