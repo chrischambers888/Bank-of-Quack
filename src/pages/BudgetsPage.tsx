@@ -173,6 +173,7 @@ export function BudgetsPage() {
     user2AvatarUrl,
     sectors,
     transactions,
+    setTransactions,
     userNames,
     deleteTransaction,
   } = useAppData();
@@ -203,6 +204,35 @@ export function BudgetsPage() {
       }, 100);
     } catch (error) {
       console.error("Error in handleDeleteTransaction:", error);
+    }
+  };
+
+  // Handle toggling transaction exclusion from monthly budgets
+  const handleToggleExclude = async (
+    transactionId: string,
+    excluded: boolean
+  ) => {
+    try {
+      const { error } = await supabase
+        .from("transactions")
+        .update({ excluded_from_monthly_budget: excluded })
+        .eq("id", transactionId);
+
+      if (error) {
+        console.error("Error updating transaction:", error);
+        return;
+      }
+
+      // Update the transaction in the local state
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === transactionId
+            ? { ...t, excluded_from_monthly_budget: excluded }
+            : t
+        )
+      );
+    } catch (error) {
+      console.error("Error toggling exclude:", error);
     }
   };
 
@@ -242,6 +272,7 @@ export function BudgetsPage() {
   const [copyFromMonthHasData, setCopyFromMonthHasData] = useState(false);
   const [showMainCalendar, setShowMainCalendar] = useState(false);
   const [showCopyCalendar, setShowCopyCalendar] = useState(false);
+
   const [tempMainSelection, setTempMainSelection] = useState<SelectedMonth>({
     year: 0,
     month: 0,
@@ -831,6 +862,7 @@ export function BudgetsPage() {
                       Carry Forward Current Budgets
                     </DropdownMenuItem>
                   )}
+
                   <DropdownMenuItem
                     onClick={handleDeleteAllBudgets}
                     disabled={isDeletingAllBudgets}
@@ -916,6 +948,7 @@ export function BudgetsPage() {
           userNames={userNames}
           deleteTransaction={handleDeleteTransaction}
           handleSetEditingTransaction={handleSetEditingTransaction}
+          onToggleExclude={handleToggleExclude}
         />
       )}
 

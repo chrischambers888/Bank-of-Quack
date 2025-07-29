@@ -17,6 +17,7 @@ import { DataTable } from "./transactions/DataTable";
 import { getColumns } from "./transactions/columns";
 import { formatMoney } from "@/lib/utils";
 import { Transaction, Category } from "@/types";
+import { Eye, EyeOff } from "lucide-react";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -32,6 +33,8 @@ interface TransactionListProps {
   userNames: string[];
   categories: Category[];
   hideIncome?: boolean;
+  showExcludeOption?: boolean;
+  onToggleExclude?: (transactionId: string, excluded: boolean) => void;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
@@ -48,6 +51,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
   userNames,
   categories,
   hideIncome = false,
+  showExcludeOption = false,
+  onToggleExclude,
 }) => {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -182,8 +187,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     isDialog
                       ? "border-gray-700 hover:bg-white/5"
                       : "border-border"
-                  } ${
-                    isExpanded ? "ring-2 ring-primary/30" : ""
+                  } ${isExpanded ? "ring-2 ring-primary/30" : ""} ${
+                    t.excluded_from_monthly_budget ? "opacity-60" : ""
                   } flex flex-col overflow-hidden animate-fade-in user-select-none focus:outline-none`}
                   onClick={() => {
                     window.getSelection()?.removeAllRanges();
@@ -335,6 +340,31 @@ const TransactionList: React.FC<TransactionListProps> = ({
                           )}
                       </div>
                       <div className="flex justify-end gap-2 mt-4">
+                        {showExcludeOption && onToggleExclude && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              onToggleExclude(
+                                t.id,
+                                !t.excluded_from_monthly_budget
+                              )
+                            }
+                            className="text-white border-white/20 hover:bg-white/10"
+                          >
+                            {t.excluded_from_monthly_budget ? (
+                              <>
+                                <Eye className="h-4 w-4 mr-1" />
+                                Include
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="h-4 w-4 mr-1" />
+                                Exclude
+                              </>
+                            )}
+                          </Button>
+                        )}
                         {handleSetEditingTransaction && (
                           <Button
                             variant="default"

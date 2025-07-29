@@ -66,6 +66,7 @@ interface TabbedBudgetDisplayProps {
   userNames: string[];
   deleteTransaction: (id: string) => Promise<void>;
   handleSetEditingTransaction: (transaction: any) => void;
+  onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
 }
 
 export function TabbedBudgetDisplay({
@@ -85,6 +86,7 @@ export function TabbedBudgetDisplay({
   userNames,
   deleteTransaction,
   handleSetEditingTransaction,
+  onToggleExclude,
 }: TabbedBudgetDisplayProps) {
   const { yellowThreshold, redThreshold } = useBudgetSettings();
   const [activeTab, setActiveTab] = useState("monthly");
@@ -2239,6 +2241,8 @@ export function TabbedBudgetDisplay({
                   }}
                   allTransactions={modalData.transactions}
                   variant="dialog"
+                  showExcludeOption={true}
+                  onToggleExclude={onToggleExclude}
                 />
               </div>
             </div>
