@@ -2207,14 +2207,28 @@ export function TabbedBudgetDisplay({
             <div className="space-y-6 pt-4">
               {/* Budget Card */}
               {modalData.type === "sector" ? (
-                <SectorBudgetCard
-                  sectorBudgetSummary={modalData.data.sectorBudget}
-                  selectedMonth={selectedMonth}
-                  user1AvatarUrl={user1AvatarUrl}
-                  user2AvatarUrl={user2AvatarUrl}
-                  onEdit={onEditSectorBudget}
-                  onDelete={onDeleteSectorBudget}
-                />
+                modalData.data.sectorBudget ? (
+                  <SectorBudgetCard
+                    sectorBudgetSummary={modalData.data.sectorBudget}
+                    selectedMonth={selectedMonth}
+                    user1AvatarUrl={user1AvatarUrl}
+                    user2AvatarUrl={user2AvatarUrl}
+                    onEdit={onEditSectorBudget}
+                    onDelete={onDeleteSectorBudget}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-white/80 mb-4">No sector budget found</p>
+                    <Button
+                      onClick={() =>
+                        onCreateSectorBudget(modalData.data.sector)
+                      }
+                      className="bg-white/10 hover:bg-white/20 text-white"
+                    >
+                      Create Sector Budget
+                    </Button>
+                  </div>
+                )
               ) : (
                 <BudgetCard
                   budgetSummary={modalData.data.budgetSummary}
