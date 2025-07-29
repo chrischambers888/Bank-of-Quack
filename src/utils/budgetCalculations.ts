@@ -1,0 +1,203 @@
+// src/utils/budgetCalculations.ts
+import { Transaction, BudgetSummary, SectorBudgetSummary } from "@/types";
+
+// Calculate reimbursements for an expense transaction
+const findReimbursementsForExpense = (expenseId: string, allTransactions: Transaction[]) => {
+  return allTransactions
+    .filter(
+      (t) =>
+        t.transaction_type === "reimbursement" &&
+        t.reimburses_transaction_id === expenseId
+    )
+    .reduce((sum, r) => sum + r.amount, 0);
+};
+
+// Calculate spent amount for a category in a given month
+export const calculateCategorySpent = (
+  categoryId: string,
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  const categoryTransactions = allTransactions.filter(
+    (t) =>
+      t.category_id === categoryId &&
+      t.transaction_type === "expense" &&
+      !t.excluded_from_monthly_budget &&
+      new Date(t.date).getFullYear() === year &&
+      new Date(t.date).getMonth() + 1 === month
+  );
+
+  return categoryTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    return sum + Math.max(0, t.amount - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user1 spent amount for a category in a given month
+export const calculateCategoryUser1Spent = (
+  categoryId: string,
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  const categoryTransactions = allTransactions.filter(
+    (t) =>
+      t.category_id === categoryId &&
+      t.transaction_type === "expense" &&
+      !t.excluded_from_monthly_budget &&
+      new Date(t.date).getFullYear() === year &&
+      new Date(t.date).getMonth() + 1 === month
+  );
+
+  return categoryTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user1_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user2 spent amount for a category in a given month
+export const calculateCategoryUser2Spent = (
+  categoryId: string,
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  const categoryTransactions = allTransactions.filter(
+    (t) =>
+      t.category_id === categoryId &&
+      t.transaction_type === "expense" &&
+      !t.excluded_from_monthly_budget &&
+      new Date(t.date).getFullYear() === year &&
+      new Date(t.date).getMonth() + 1 === month
+  );
+
+  return categoryTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user2_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate spent amount for a sector in a given month
+export const calculateSectorSpent = (
+  sectorCategoryIds: string[],
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  const sectorTransactions = allTransactions.filter(
+    (t) =>
+      sectorCategoryIds.includes(t.category_id!) &&
+      t.transaction_type === "expense" &&
+      !t.excluded_from_monthly_budget &&
+      new Date(t.date).getFullYear() === year &&
+      new Date(t.date).getMonth() + 1 === month
+  );
+
+  return sectorTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    return sum + Math.max(0, t.amount - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user1 spent amount for a sector in a given month
+export const calculateSectorUser1Spent = (
+  sectorCategoryIds: string[],
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  const sectorTransactions = allTransactions.filter(
+    (t) =>
+      sectorCategoryIds.includes(t.category_id!) &&
+      t.transaction_type === "expense" &&
+      !t.excluded_from_monthly_budget &&
+      new Date(t.date).getFullYear() === year &&
+      new Date(t.date).getMonth() + 1 === month
+  );
+
+  return sectorTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user1_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user2 spent amount for a sector in a given month
+export const calculateSectorUser2Spent = (
+  sectorCategoryIds: string[],
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  const sectorTransactions = allTransactions.filter(
+    (t) =>
+      sectorCategoryIds.includes(t.category_id!) &&
+      t.transaction_type === "expense" &&
+      !t.excluded_from_monthly_budget &&
+      new Date(t.date).getFullYear() === year &&
+      new Date(t.date).getMonth() + 1 === month
+  );
+
+  return sectorTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user2_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate budget amount from budget summary
+export const calculateBudgetAmount = (budget: BudgetSummary | SectorBudgetSummary): number => {
+  if (budget.budget_type === "absolute") {
+    return budget.absolute_amount || 0;
+  } else if (budget.budget_type === "split") {
+    return (budget.user1_amount || 0) + (budget.user2_amount || 0);
+  }
+  return 0;
+};
+
+// Calculate remaining percentage
+export const calculateRemainingPercentage = (budgetAmount: number, spentAmount: number): number | null => {
+  if (budgetAmount > 0) {
+    return Math.round(((budgetAmount - spentAmount) / budgetAmount) * 100 * 100) / 100;
+  }
+  return null;
+};
+
+// Calculate remaining amount
+export const calculateRemainingAmount = (budgetAmount: number, spentAmount: number): number | null => {
+  if (budgetAmount > 0) {
+    return budgetAmount - spentAmount;
+  }
+  return null;
+}; 

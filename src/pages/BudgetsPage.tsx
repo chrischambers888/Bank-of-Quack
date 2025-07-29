@@ -71,6 +71,17 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAppData } from "@/hooks/useAppData";
 import { useBudgetMonthNavigation } from "@/hooks/useBudgetMonthNavigation";
+import {
+  calculateCategorySpent,
+  calculateCategoryUser1Spent,
+  calculateCategoryUser2Spent,
+  calculateSectorSpent,
+  calculateSectorUser1Spent,
+  calculateSectorUser2Spent,
+  calculateBudgetAmount,
+  calculateRemainingPercentage,
+  calculateRemainingAmount,
+} from "@/utils/budgetCalculations";
 
 // Custom Month/Year Picker Component
 interface MonthYearPickerProps {
@@ -330,34 +341,145 @@ export function BudgetsPage() {
       setHasBudgetData(monthHasData);
 
       if (monthHasData) {
-        // Load budget summaries for the selected month
-        const { data: budgetData, error: budgetError } = await supabase.rpc(
-          "get_budget_summary_for_month",
-          {
-            p_year: selectedMonth.year,
-            p_month: selectedMonth.month,
-          }
-        );
+        // Load category budgets for the selected month
+        const { data: categoryBudgetsData, error: categoryBudgetsError } =
+          await supabase
+            .from("category_budgets")
+            .select("*")
+            .eq("year", selectedMonth.year)
+            .eq("month", selectedMonth.month);
 
-        if (budgetError) throw budgetError;
-        setBudgetSummaries(budgetData || []);
+        if (categoryBudgetsError) throw categoryBudgetsError;
 
-        // Load sector budget summaries for the selected month
-        const { data: sectorBudgetData, error: sectorBudgetError } =
-          await supabase.rpc("get_sector_budget_summary_for_month", {
-            p_year: selectedMonth.year,
-            p_month: selectedMonth.month,
-          });
+        // Load sector budgets for the selected month
+        const { data: sectorBudgetsData, error: sectorBudgetsError } =
+          await supabase
+            .from("sector_budgets")
+            .select("*")
+            .eq("year", selectedMonth.year)
+            .eq("month", selectedMonth.month);
 
-        if (sectorBudgetError) {
-          console.warn(
-            "Error loading sector budget summaries:",
-            sectorBudgetError
-          );
-          setSectorBudgetSummaries([]);
-        } else {
-          setSectorBudgetSummaries(sectorBudgetData || []);
+        if (sectorBudgetsError) {
+          console.warn("Error loading sector budgets:", sectorBudgetsError);
         }
+
+        // Calculate budget summaries client-side
+        const budgetSummaries = categories
+          .map((category) => {
+            const budget = categoryBudgetsData?.find(
+              (b) => b.category_id === category.id
+            );
+            if (!budget) return null;
+
+            const spent = calculateCategorySpent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user1Spent = calculateCategoryUser1Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user2Spent = calculateCategoryUser2Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const budgetAmount = calculateBudgetAmount(budget);
+            const remainingPercentage = calculateRemainingPercentage(
+              budgetAmount,
+              spent
+            );
+            const remainingAmount = calculateRemainingAmount(
+              budgetAmount,
+              spent
+            );
+
+            return {
+              category_id: category.id,
+              category_name: category.name,
+              category_image: category.image_url,
+              budget_id: budget.id,
+              budget_type: budget.budget_type,
+              absolute_amount: budget.absolute_amount,
+              user1_amount: budget.user1_amount,
+              user2_amount: budget.user2_amount,
+              current_year: selectedMonth.year,
+              current_month: selectedMonth.month,
+              current_period_budget: budgetAmount,
+              current_period_spent: spent,
+              current_period_user1_spent: user1Spent,
+              current_period_user2_spent: user2Spent,
+              current_period_remaining_percentage: remainingPercentage,
+              current_period_remaining_amount: remainingAmount,
+            };
+          })
+          .filter(Boolean);
+
+        setBudgetSummaries(budgetSummaries as BudgetSummary[]);
+
+        // Calculate sector budget summaries client-side
+        const sectorBudgetSummaries = sectors.map((sector) => {
+          const budget = sectorBudgetsData?.find(
+            (b) => b.sector_id === sector.id
+          );
+
+          const spent = calculateSectorSpent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user1Spent = calculateSectorUser1Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user2Spent = calculateSectorUser2Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const budgetAmount = budget ? calculateBudgetAmount(budget) : 0;
+          const remainingPercentage = calculateRemainingPercentage(
+            budgetAmount,
+            spent
+          );
+          const remainingAmount = calculateRemainingAmount(budgetAmount, spent);
+
+          // Count category budgets in this sector
+          const categoryBudgetsTotal = budgetSummaries.filter(
+            (bs) => bs && sector.category_ids.includes(bs.category_id)
+          ).length;
+
+          return {
+            sector_id: sector.id,
+            sector_name: sector.name,
+            budget_id: budget?.id,
+            budget_type: budget?.budget_type,
+            absolute_amount: budget?.absolute_amount,
+            user1_amount: budget?.user1_amount,
+            user2_amount: budget?.user2_amount,
+            auto_rollup: budget?.auto_rollup || false,
+            current_period_budget: budgetAmount,
+            current_period_spent: spent,
+            current_period_user1_spent: user1Spent,
+            current_period_user2_spent: user2Spent,
+            current_period_remaining_percentage: remainingPercentage,
+            current_period_remaining_amount: remainingAmount,
+            category_budgets_total: categoryBudgetsTotal,
+          };
+        });
+
+        setSectorBudgetSummaries(
+          sectorBudgetSummaries as SectorBudgetSummary[]
+        );
       } else {
         setBudgetSummaries([]);
         setSectorBudgetSummaries([]);
