@@ -8,6 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { BudgetCard } from "./BudgetCard";
 import { SectorBudgetCard } from "./SectorBudgetCard";
 import { EmptyStateCard } from "./EmptyStateCard";
@@ -62,6 +64,10 @@ interface TabbedBudgetDisplayProps {
   onDeleteBudget: (categoryId: string) => void;
   onEditSectorBudget: (sectorBudget: SectorBudgetSummary) => void;
   onDeleteSectorBudget: (sectorId: string) => void;
+  onDeleteSectorBudgetDirect?: (
+    sectorId: string,
+    deleteCategoryBudgets?: boolean
+  ) => Promise<void>;
   onCreateBudget: (category: Category) => void;
   onCreateSectorBudget: (sector: Sector) => void;
   userNames: string[];
@@ -87,6 +93,7 @@ export function TabbedBudgetDisplay({
   onDeleteBudget,
   onEditSectorBudget,
   onDeleteSectorBudget,
+  onDeleteSectorBudgetDirect,
   onCreateBudget,
   onCreateSectorBudget,
   userNames,
@@ -115,6 +122,17 @@ export function TabbedBudgetDisplay({
     data: any;
     transactions: any[];
   } | null>(null);
+  const [deleteSectorDialog, setDeleteSectorDialog] = useState<{
+    show: boolean;
+    sectorId: string;
+    sectorName: string;
+    deleteCategoryBudgets: boolean;
+  }>({
+    show: false,
+    sectorId: "",
+    sectorName: "",
+    deleteCategoryBudgets: true,
+  });
 
   const showTooltip = (
     message: string,
@@ -446,10 +464,48 @@ export function TabbedBudgetDisplay({
     await refreshModalTransactions();
   };
 
+  const handleDeleteSectorBudget = (sectorId: string, sectorName: string) => {
+    setDeleteSectorDialog({
+      show: true,
+      sectorId,
+      sectorName,
+      deleteCategoryBudgets: true,
+    });
+  };
+
+  const confirmDeleteSectorBudget = async () => {
+    if (onDeleteSectorBudgetDirect) {
+      await onDeleteSectorBudgetDirect(
+        deleteSectorDialog.sectorId,
+        deleteSectorDialog.deleteCategoryBudgets
+      );
+    } else {
+      onDeleteSectorBudget(deleteSectorDialog.sectorId);
+    }
+    setDeleteSectorDialog({
+      show: false,
+      sectorId: "",
+      sectorName: "",
+      deleteCategoryBudgets: true,
+    });
+  };
+
+  const cancelDeleteSectorBudget = () => {
+    setDeleteSectorDialog({
+      show: false,
+      sectorId: "",
+      sectorName: "",
+      deleteCategoryBudgets: true,
+    });
+  };
+
   const getBudgetStats = () => {
-    // Calculate sector budgets total
+    // Calculate sector budgets total (only for sectors with budgets)
     const sectorBudgetsTotal = sectorBudgetSummaries.reduce(
       (sum, sectorBudget) => {
+        if (!sectorBudget.budget_id) {
+          return sum; // Skip sectors without budgets
+        }
         const budget =
           sectorBudget.budget_type === "absolute"
             ? sectorBudget.absolute_amount || 0
@@ -460,18 +516,21 @@ export function TabbedBudgetDisplay({
       0
     );
 
-    // Calculate category budgets total (only for categories without sector budgets)
-    const categoriesWithSectors = new Set();
-    sectors?.forEach((sector) => {
-      sector.category_ids?.forEach((categoryId) => {
-        categoriesWithSectors.add(categoryId);
-      });
-    });
-
+    // Calculate category budgets total
     const activeCategoryBudgets = budgetSummaries.filter((b) => b.budget_id);
     const categoryBudgetsTotal = activeCategoryBudgets.reduce((sum, budget) => {
-      // Only include category budgets for categories that don't have a sector budget
-      if (categoriesWithSectors.has(budget.category_id)) {
+      // Check if this category belongs to a sector with a budget
+      const sectorWithBudget = sectors?.find((sector) => {
+        if (!sector.category_ids?.includes(budget.category_id)) {
+          return false; // Category doesn't belong to this sector
+        }
+        const sectorBudget = sectorBudgetSummaries.find(
+          (sb) => sb.sector_id === sector.id
+        );
+        return sectorBudget?.budget_id; // Only exclude if sector has a budget
+      });
+
+      if (sectorWithBudget) {
         return sum; // Skip this category budget as it's covered by sector budget
       }
 
@@ -482,17 +541,30 @@ export function TabbedBudgetDisplay({
       return sum + budgetAmount;
     }, 0);
 
-    // Total budget is sector budgets + category budgets (for categories without sectors)
+    // Total budget is sector budgets + category budgets (for categories without sector budgets)
     const totalBudget = sectorBudgetsTotal + categoryBudgetsTotal;
 
     // Calculate total spent (from both sector and category budgets)
-    const sectorSpent = sectorBudgetSummaries.reduce(
-      (sum, b) => sum + (b.current_period_spent || 0),
-      0
-    );
+    const sectorSpent = sectorBudgetSummaries.reduce((sum, b) => {
+      // Only include spending from sectors that have budgets
+      if (b.budget_id) {
+        return sum + (b.current_period_spent || 0);
+      }
+      return sum;
+    }, 0);
     const categorySpent = activeCategoryBudgets.reduce((sum, budget) => {
-      // Only include category spending for categories that don't have a sector budget
-      if (categoriesWithSectors.has(budget.category_id)) {
+      // Check if this category belongs to a sector with a budget
+      const sectorWithBudget = sectors?.find((sector) => {
+        if (!sector.category_ids?.includes(budget.category_id)) {
+          return false; // Category doesn't belong to this sector
+        }
+        const sectorBudget = sectorBudgetSummaries.find(
+          (sb) => sb.sector_id === sector.id
+        );
+        return sectorBudget?.budget_id; // Only exclude if sector has a budget
+      });
+
+      if (sectorWithBudget) {
         return sum; // Skip this category spending as it's covered by sector spending
       }
       return sum + (budget.current_period_spent || 0);
@@ -755,56 +827,77 @@ export function TabbedBudgetDisplay({
                                     </Button>
                                   </div>
                                 </td>
-                                <td className="text-right py-3 px-4 font-medium">
-                                  {formatCurrency(sectorTotal)}
-                                </td>
-                                <td className="text-right py-3 px-4">
-                                  {formatCurrency(sectorSpent)}
-                                </td>
-                                <td
-                                  className={`text-right py-3 px-4 font-medium ${
-                                    sectorOverUnder < 0
-                                      ? "text-red-600"
-                                      : "text-green-600"
-                                  }`}
-                                >
-                                  {formatCurrency(Math.abs(sectorOverUnder))}
-                                </td>
-                                <td className="text-right py-3 px-4">
-                                  <div className="flex items-center justify-end space-x-2">
-                                    <div
-                                      className={`w-16 rounded-full h-2 ${
-                                        sectorPercentage === 0
-                                          ? "bg-gray-600"
-                                          : "bg-gray-200"
+                                {sectorBudget?.budget_id ? (
+                                  <>
+                                    <td className="text-right py-3 px-4 font-medium">
+                                      {formatCurrency(sectorTotal)}
+                                    </td>
+                                    <td className="text-right py-3 px-4">
+                                      {formatCurrency(sectorSpent)}
+                                    </td>
+                                    <td
+                                      className={`text-right py-3 px-4 font-medium ${
+                                        sectorOverUnder < 0
+                                          ? "text-red-600"
+                                          : "text-green-600"
                                       }`}
                                     >
-                                      <div
-                                        className={`h-2 rounded-full transition-all duration-300 ${
-                                          sectorPercentage > 100
-                                            ? "bg-red-500"
-                                            : sectorPercentage >=
-                                              yellowThreshold
-                                            ? "bg-yellow-500"
-                                            : sectorPercentage > 0
-                                            ? "bg-green-500"
-                                            : "bg-gray-600"
-                                        }`}
-                                        style={{
-                                          width: `${Math.min(
-                                            sectorPercentage,
-                                            100
-                                          )}%`,
-                                        }}
-                                      />
-                                    </div>
-                                    <span className="text-xs w-12 text-right">
-                                      {sectorPercentage.toFixed(1)}%
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="text-center py-3 px-4">
-                                  {sectorBudget?.budget_id ? (
+                                      {formatCurrency(
+                                        Math.abs(sectorOverUnder)
+                                      )}
+                                    </td>
+                                    <td className="text-right py-3 px-4">
+                                      <div className="flex items-center justify-end space-x-2">
+                                        <div
+                                          className={`w-16 rounded-full h-2 ${
+                                            sectorPercentage === 0
+                                              ? "bg-gray-600"
+                                              : "bg-gray-200"
+                                          }`}
+                                        >
+                                          <div
+                                            className={`h-2 rounded-full transition-all duration-300 ${
+                                              sectorPercentage > 100
+                                                ? "bg-red-500"
+                                                : sectorPercentage >=
+                                                  yellowThreshold
+                                                ? "bg-yellow-500"
+                                                : sectorPercentage > 0
+                                                ? "bg-green-500"
+                                                : "bg-gray-600"
+                                            }`}
+                                            style={{
+                                              width: `${Math.min(
+                                                sectorPercentage,
+                                                100
+                                              )}%`,
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="text-xs w-12 text-right">
+                                          {sectorPercentage.toFixed(1)}%
+                                        </span>
+                                      </div>
+                                    </td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td className="text-right py-3 px-4 text-muted-foreground">
+                                      —
+                                    </td>
+                                    <td className="text-right py-3 px-4 text-muted-foreground">
+                                      —
+                                    </td>
+                                    <td className="text-right py-3 px-4 text-muted-foreground">
+                                      —
+                                    </td>
+                                    <td className="text-right py-3 px-4 text-muted-foreground">
+                                      —
+                                    </td>
+                                  </>
+                                )}
+                                {sectorBudget?.budget_id ? (
+                                  <td className="text-center py-3 px-4">
                                     <div className="flex justify-center">
                                       {sectorBudget.auto_rollup ? (
                                         <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
@@ -828,14 +921,12 @@ export function TabbedBudgetDisplay({
                                         </div>
                                       )}
                                     </div>
-                                  ) : (
-                                    <div className="flex justify-center">
-                                      <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </td>
+                                  </td>
+                                ) : (
+                                  <td className="text-center py-3 px-4 text-muted-foreground">
+                                    —
+                                  </td>
+                                )}
                                 <td className="text-center py-3 px-4">
                                   <div className="flex justify-center space-x-1">
                                     {sectorBudget?.budget_id ? (
@@ -855,7 +946,10 @@ export function TabbedBudgetDisplay({
                                           size="sm"
                                           variant="ghost"
                                           onClick={() =>
-                                            onDeleteSectorBudget(sector.id)
+                                            handleDeleteSectorBudget(
+                                              sector.id,
+                                              sector.name
+                                            )
                                           }
                                           className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
                                         >
@@ -1453,42 +1547,34 @@ export function TabbedBudgetDisplay({
                                 </div>
                               </div>
                               <div className="flex items-center space-x-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted/50"
-                                  onClick={(e) => {
-                                    console.log("Button clicked!");
-                                    e.stopPropagation();
-                                    if (sectorBudget?.budget_id) {
+                                {sectorBudget?.budget_id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 hover:bg-muted/50"
+                                    onClick={(e) => {
+                                      console.log("Button clicked!");
+                                      e.stopPropagation();
                                       showTooltip(
                                         sectorBudget.auto_rollup
                                           ? "Auto-rolled up budget"
                                           : "Manual budget",
                                         e
                                       );
-                                    } else {
-                                      showTooltip("No sector budget", e);
-                                    }
-                                  }}
-                                  onTouchStart={(e) => {
-                                    console.log("Button touched!");
-                                    e.stopPropagation();
-                                    if (sectorBudget?.budget_id) {
+                                    }}
+                                    onTouchStart={(e) => {
+                                      console.log("Button touched!");
+                                      e.stopPropagation();
                                       showTooltip(
                                         sectorBudget.auto_rollup
                                           ? "Auto-rolled up budget"
                                           : "Manual budget",
                                         e
                                       );
-                                    } else {
-                                      showTooltip("No sector budget", e);
-                                    }
-                                  }}
-                                  onMouseLeave={hideTooltip}
-                                >
-                                  {sectorBudget?.budget_id ? (
-                                    sectorBudget.auto_rollup ? (
+                                    }}
+                                    onMouseLeave={hideTooltip}
+                                  >
+                                    {sectorBudget.auto_rollup ? (
                                       <CheckCircle className="h-5 w-5 text-green-600" />
                                     ) : (
                                       <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
@@ -1496,11 +1582,9 @@ export function TabbedBudgetDisplay({
                                           M
                                         </span>
                                       </div>
-                                    )
-                                  ) : (
-                                    <Circle className="h-5 w-5 text-gray-400" />
-                                  )}
-                                </Button>
+                                    )}
+                                  </Button>
+                                )}
                                 {sectorBudget?.budget_id ? (
                                   <>
                                     <Button
@@ -1517,7 +1601,10 @@ export function TabbedBudgetDisplay({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() =>
-                                        onDeleteSectorBudget(sector.id)
+                                        handleDeleteSectorBudget(
+                                          sector.id,
+                                          sector.name
+                                        )
                                       }
                                       className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
                                     >
@@ -1538,67 +1625,77 @@ export function TabbedBudgetDisplay({
                             </div>
 
                             {/* Sector Stats */}
-                            <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Budget</p>
-                                <p className="font-medium">
-                                  {formatCurrency(sectorTotal)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Spent</p>
-                                <p className="font-medium">
-                                  {formatCurrency(sectorSpent)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">
-                                  {sectorOverUnder < 0 ? "Over" : "Under"}
-                                </p>
-                                <p
-                                  className={`font-medium ${
-                                    sectorOverUnder < 0
-                                      ? "text-red-600"
-                                      : "text-green-600"
-                                  }`}
-                                >
-                                  {formatCurrency(Math.abs(sectorOverUnder))}
-                                </p>
-                              </div>
-                            </div>
+                            {sectorBudget?.budget_id ? (
+                              <>
+                                <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">
+                                      Budget
+                                    </p>
+                                    <p className="font-medium">
+                                      {formatCurrency(sectorTotal)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">
+                                      Spent
+                                    </p>
+                                    <p className="font-medium">
+                                      {formatCurrency(sectorSpent)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">
+                                      {sectorOverUnder < 0 ? "Over" : "Under"}
+                                    </p>
+                                    <p
+                                      className={`font-medium ${
+                                        sectorOverUnder < 0
+                                          ? "text-red-600"
+                                          : "text-green-600"
+                                      }`}
+                                    >
+                                      {formatCurrency(
+                                        Math.abs(sectorOverUnder)
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
 
-                            {/* Progress Bar */}
-                            <div className="mt-3">
-                              <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                <span>Progress</span>
-                                <span>{sectorPercentage.toFixed(1)}%</span>
-                              </div>
-                              <div
-                                className={`w-full rounded-full h-2 ${
-                                  sectorPercentage === 0
-                                    ? "bg-gray-600"
-                                    : "bg-gray-200"
-                                }`}
-                              >
-                                <div
-                                  className={`h-2 rounded-full transition-all duration-300 ${
-                                    sectorPercentage > 100
-                                      ? "bg-red-500"
-                                      : sectorPercentage >= yellowThreshold
-                                      ? "bg-yellow-500"
-                                      : sectorPercentage > 0
-                                      ? "bg-green-500"
-                                      : "bg-gray-600"
-                                  }`}
-                                  style={{
-                                    width: `${Math.min(
-                                      sectorPercentage,
-                                      100
-                                    )}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
+                                {/* Progress Bar */}
+                                <div className="mt-3">
+                                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                    <span>Progress</span>
+                                    <span>{sectorPercentage.toFixed(1)}%</span>
+                                  </div>
+                                  <div
+                                    className={`w-full rounded-full h-2 ${
+                                      sectorPercentage === 0
+                                        ? "bg-gray-600"
+                                        : "bg-gray-200"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`h-2 rounded-full transition-all duration-300 ${
+                                        sectorPercentage > 100
+                                          ? "bg-red-500"
+                                          : sectorPercentage >= yellowThreshold
+                                          ? "bg-yellow-500"
+                                          : sectorPercentage > 0
+                                          ? "bg-green-500"
+                                          : "bg-gray-600"
+                                      }`}
+                                      style={{
+                                        width: `${Math.min(
+                                          sectorPercentage,
+                                          100
+                                        )}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}
                           </div>
 
                           {/* Category Cards - Show when expanded */}
@@ -2334,7 +2431,7 @@ export function TabbedBudgetDisplay({
             <div className="space-y-6 pt-4">
               {/* Budget Card */}
               {modalData.type === "sector" ? (
-                modalData.data.sectorBudget ? (
+                modalData.data.sectorBudget?.budget_id ? (
                   <SectorBudgetCard
                     sectorBudgetSummary={modalData.data.sectorBudget}
                     selectedMonth={selectedMonth}
@@ -2348,6 +2445,10 @@ export function TabbedBudgetDisplay({
                 ) : (
                   <div className="text-center py-8">
                     <p className="text-white/80 mb-4">No sector budget found</p>
+                    <p className="text-white/60 text-sm mb-4">
+                      Transactions are shown below, but spending is not tracked
+                      at the sector level without a budget.
+                    </p>
                     <Button
                       onClick={() =>
                         onCreateSectorBudget(modalData.data.sector)
@@ -2396,6 +2497,54 @@ export function TabbedBudgetDisplay({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Sector Budget Confirmation Dialog */}
+      <Dialog
+        open={deleteSectorDialog.show}
+        onOpenChange={() => cancelDeleteSectorBudget()}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              Delete Sector Budget
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground">
+              Are you sure you want to delete the budget for "
+              {deleteSectorDialog.sectorName}"?
+            </p>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="delete-category-budgets"
+                checked={deleteSectorDialog.deleteCategoryBudgets}
+                onCheckedChange={(checked) =>
+                  setDeleteSectorDialog((prev) => ({
+                    ...prev,
+                    deleteCategoryBudgets: checked as boolean,
+                  }))
+                }
+              />
+              <Label
+                htmlFor="delete-category-budgets"
+                className="text-sm text-foreground"
+              >
+                Also delete all category budgets in this sector
+              </Label>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={cancelDeleteSectorBudget}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteSectorBudget}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

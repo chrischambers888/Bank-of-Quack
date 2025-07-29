@@ -651,15 +651,43 @@ export function BudgetsPage() {
     setDeletingSectorBudgetId(sectorId);
   };
 
-  const handleDeleteSectorBudget = async (sectorId: string) => {
+  const handleDeleteSectorBudget = async (
+    sectorId: string,
+    deleteCategoryBudgets: boolean = false
+  ) => {
     try {
-      const { error } = await supabase.rpc("delete_sector_budget_for_month", {
-        p_sector_id: sectorId,
-        p_year: selectedMonth.year,
-        p_month: selectedMonth.month,
-      });
+      // Delete sector budget
+      const { error: sectorError } = await supabase.rpc(
+        "delete_sector_budget_for_month",
+        {
+          p_sector_id: sectorId,
+          p_year: selectedMonth.year,
+          p_month: selectedMonth.month,
+        }
+      );
 
-      if (error) throw error;
+      if (sectorError) throw sectorError;
+
+      // If checkbox is checked, also delete category budgets in this sector
+      if (deleteCategoryBudgets) {
+        const sector = sectors.find((s) => s.id === sectorId);
+        if (sector && sector.category_ids.length > 0) {
+          // Delete category budgets for all categories in this sector
+          for (const categoryId of sector.category_ids) {
+            const { error: categoryError } = await supabase.rpc(
+              "delete_budget_for_month",
+              {
+                p_category_id: categoryId,
+                p_year: selectedMonth.year,
+                p_month: selectedMonth.month,
+              }
+            );
+
+            if (categoryError) throw categoryError;
+          }
+        }
+      }
+
       await loadData();
     } catch (error) {
       console.error("Error deleting sector budget:", error);
@@ -1143,6 +1171,7 @@ export function BudgetsPage() {
           onDeleteBudget={handleDeleteBudgetConfirm}
           onEditSectorBudget={handleEditSectorBudget}
           onDeleteSectorBudget={handleDeleteSectorBudgetConfirm}
+          onDeleteSectorBudgetDirect={handleDeleteSectorBudget}
           onCreateBudget={handleCreateBudget}
           onCreateSectorBudget={handleCreateSectorBudget}
           userNames={userNames}
