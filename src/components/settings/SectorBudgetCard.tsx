@@ -10,7 +10,7 @@ import {
   AlertTriangle,
   DollarSign,
 } from "lucide-react";
-import { SectorBudgetSummary, SelectedMonth } from "@/types";
+import { SectorBudgetSummary, SelectedMonth, BudgetSummary } from "@/types";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import { supabase } from "@/supabaseClient";
 
@@ -21,6 +21,8 @@ interface SectorBudgetCardProps {
   selectedMonth: SelectedMonth;
   user1AvatarUrl?: string | null;
   user2AvatarUrl?: string | null;
+  budgetSummaries?: BudgetSummary[];
+  sectors?: any[];
 }
 
 export function SectorBudgetCard({
@@ -30,6 +32,8 @@ export function SectorBudgetCard({
   selectedMonth,
   user1AvatarUrl,
   user2AvatarUrl,
+  budgetSummaries = [],
+  sectors = [],
 }: SectorBudgetCardProps) {
   const [userNames, setUserNames] = useState({
     user1: "User 1",
@@ -137,6 +141,33 @@ export function SectorBudgetCard({
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
 
+  // Calculate category budgets total client-side
+  const calculateCategoryBudgetsTotal = () => {
+    if (!budgetSummaries || budgetSummaries.length === 0) {
+      return category_budgets_total || 0; // Fallback to database value if no client data
+    }
+
+    // Find the current sector
+    const currentSector = sectors.find((s) => s.id === sector_id);
+    if (!currentSector) {
+      return category_budgets_total || 0; // Fallback if sector not found
+    }
+
+    // Filter budgets for categories that belong to this sector
+    return budgetSummaries
+      .filter((budget) => {
+        // Check if this category belongs to the current sector
+        return (
+          currentSector.category_ids &&
+          currentSector.category_ids.includes(budget.category_id)
+        );
+      })
+      .reduce((total, budget) => {
+        const budgetAmount = budget.current_period_budget || 0;
+        return total + budgetAmount;
+      }, 0);
+  };
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -167,12 +198,16 @@ export function SectorBudgetCard({
           <Badge variant="secondary">
             {budget_type === "absolute" ? "Absolute" : "Split"}
           </Badge>
-          {auto_rollup && (
+          {auto_rollup ? (
             <Badge
               variant="secondary"
               className="bg-green-500/20 text-green-600"
             >
               Auto Rollup
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="bg-blue-500/20 text-blue-600">
+              Manual
             </Badge>
           )}
         </div>
@@ -187,7 +222,7 @@ export function SectorBudgetCard({
             </span>
             <div className="text-right">
               <div className="font-semibold">
-                ${category_budgets_total.toFixed(2)}
+                ${calculateCategoryBudgetsTotal().toFixed(2)}
               </div>
               {isOverCategoryBudgets() && (
                 <div className="text-xs text-red-500">Over sector budget</div>

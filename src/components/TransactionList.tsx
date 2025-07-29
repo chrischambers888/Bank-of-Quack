@@ -262,7 +262,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                       <div
                         className={`text-base font-semibold text-white ${
                           isExpanded ? "" : "truncate"
-                        }`}
+                        } ${isDialog ? "max-w-[120px] sm:max-w-none" : ""}`}
                       >
                         {t.description}
                       </div>
@@ -275,7 +275,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                       </div>
                     </div>
                     {/* Amount */}
-                    <div className="flex flex-col items-end min-w-[70px]">
+                    <div className="flex flex-col items-end min-w-[70px] flex-shrink-0">
                       <span
                         className={`text-lg font-bold ${
                           isPositive ? "text-green-600" : "text-red-500"

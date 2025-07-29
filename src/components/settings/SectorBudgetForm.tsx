@@ -67,6 +67,14 @@ export function SectorBudgetForm({
     setIsSubmitting(true);
     setError(null); // Clear any previous errors
 
+    // Client-side validation
+    const validationError = validateManualBudget();
+    if (validationError) {
+      setError(validationError);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.rpc("create_sector_budget_for_month", {
         p_sector_id: formData.sector_id,
@@ -148,6 +156,21 @@ export function SectorBudgetForm({
     }
   };
 
+  // Validate that manual budget is sufficient for category budgets
+  const validateManualBudget = () => {
+    if (formData.budget_type === "absolute" && !formData.auto_rollup) {
+      const manualAmount = formData.absolute_amount || 0;
+      if (manualAmount < categoryBudgetsTotal) {
+        return `Manual budget amount ($${manualAmount.toFixed(
+          2
+        )}) cannot be less than the sum of category budgets ($${categoryBudgetsTotal.toFixed(
+          2
+        )}). Please increase the budget amount or enable auto-rollup to automatically match the category budgets total.`;
+      }
+    }
+    return null;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Error Display */}
@@ -171,6 +194,30 @@ export function SectorBudgetForm({
               </svg>
             </div>
             <div className="text-sm text-red-400">{error}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning Display for insufficient manual budget */}
+      {!error && validateManualBudget() && (
+        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md">
+          <div className="flex items-center space-x-2">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-yellow-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="text-sm text-yellow-400">
+              {validateManualBudget()}
+            </div>
           </div>
         </div>
       )}

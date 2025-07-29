@@ -2285,6 +2285,8 @@ export function TabbedBudgetDisplay({
                     user2AvatarUrl={user2AvatarUrl}
                     onEdit={onEditSectorBudget}
                     onDelete={onDeleteSectorBudget}
+                    budgetSummaries={budgetSummaries}
+                    sectors={sectors}
                   />
                 ) : (
                   <div className="text-center py-8">
