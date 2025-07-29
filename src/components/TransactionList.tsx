@@ -197,7 +197,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   }}
                 >
                   {/* Top row: image, details, amount */}
-                  <div className="flex items-center gap-4 px-2 py-3">
+                  <div className="flex items-center gap-3 px-2 py-3">
                     {/* Category image */}
                     <div className="flex-shrink-0">
                       {(() => {
@@ -262,7 +262,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                       <div
                         className={`text-base font-semibold text-white ${
                           isExpanded ? "" : "truncate"
-                        } ${isDialog ? "max-w-[120px] sm:max-w-none" : ""}`}
+                        } ${isDialog ? "max-w-[100px] sm:max-w-none" : ""}`}
                       >
                         {t.description}
                       </div>
@@ -274,8 +274,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         {dateLabel}
                       </div>
                     </div>
-                    {/* Amount */}
-                    <div className="flex flex-col items-end min-w-[70px] flex-shrink-0">
+                    {/* Amount and Exclude/Include button */}
+                    <div className="flex items-center gap-2 min-w-[80px] flex-shrink-0">
                       <span
                         className={`text-lg font-bold ${
                           isPositive ? "text-green-600" : "text-red-500"
@@ -285,6 +285,30 @@ const TransactionList: React.FC<TransactionListProps> = ({
                           ? `${isPositive ? "+" : "-"}${formatMoney(t.amount)}`
                           : "•••••"}
                       </span>
+                      {showExcludeOption && onToggleExclude && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleExclude(
+                              t.id,
+                              !t.excluded_from_monthly_budget
+                            );
+                          }}
+                          className={`h-6 w-6 p-0 ${
+                            isDialog
+                              ? "text-white hover:bg-white/10"
+                              : "hover:bg-muted"
+                          }`}
+                        >
+                          {t.excluded_from_monthly_budget ? (
+                            <Eye className="h-4 w-4" />
+                          ) : (
+                            <EyeOff className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {/* Expanded details and buttons inside the box */}
@@ -340,31 +364,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
                           )}
                       </div>
                       <div className="flex justify-end gap-2 mt-4">
-                        {showExcludeOption && onToggleExclude && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              onToggleExclude(
-                                t.id,
-                                !t.excluded_from_monthly_budget
-                              )
-                            }
-                            className="text-white border-white/20 hover:bg-white/10"
-                          >
-                            {t.excluded_from_monthly_budget ? (
-                              <>
-                                <Eye className="h-4 w-4 mr-1" />
-                                Include
-                              </>
-                            ) : (
-                              <>
-                                <EyeOff className="h-4 w-4 mr-1" />
-                                Exclude
-                              </>
-                            )}
-                          </Button>
-                        )}
                         {handleSetEditingTransaction && (
                           <Button
                             variant="default"
