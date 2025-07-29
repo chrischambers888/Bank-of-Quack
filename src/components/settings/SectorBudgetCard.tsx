@@ -90,6 +90,14 @@ export function SectorBudgetCard({
     }
   };
 
+  const getActualPercentage = () => {
+    if (!current_period_budget || current_period_budget === 0) {
+      // For zero budgets, show 100% if there's any spending, 0% if no spending
+      return (current_period_spent || 0) > 0 ? 100 : 0;
+    }
+    return ((current_period_spent || 0) / current_period_budget) * 100;
+  };
+
   const getProgressPercentage = () => {
     if (!current_period_budget || current_period_budget === 0) {
       // For zero budgets, show 100% if there's any spending, 0% if no spending
@@ -101,7 +109,7 @@ export function SectorBudgetCard({
   };
 
   const getProgressColor = () => {
-    const percentage = getProgressPercentage();
+    const percentage = getActualPercentage();
     // For zero budgets, any spending should be red
     if (current_period_budget === 0 && (current_period_spent || 0) > 0)
       return "bg-red-500";
@@ -248,16 +256,16 @@ export function SectorBudgetCard({
                 backgroundColor={
                   (current_period_budget === 0 &&
                     (current_period_spent || 0) > 0) ||
-                  getProgressPercentage() > 100
+                  getActualPercentage() > 100
                     ? "rgb(239 68 68)"
                     : "rgb(75 85 99)" // Subtle dark gray that matches the theme
                 }
                 indicatorColor={
                   (current_period_budget === 0 &&
                     (current_period_spent || 0) > 0) ||
-                  getProgressPercentage() > 100
+                  getActualPercentage() > 100
                     ? "rgb(239 68 68)"
-                    : getProgressPercentage() >= yellowThreshold
+                    : getActualPercentage() >= yellowThreshold
                     ? "rgb(234 179 8)"
                     : "rgb(34 197 94)"
                 }

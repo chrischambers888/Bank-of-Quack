@@ -107,6 +107,10 @@ export function BudgetCard({
     budget_type === "absolute"
       ? absolute_amount || 0
       : (user1_amount || 0) + (user2_amount || 0);
+  const actualPercentage =
+    totalBudget && current_period_spent
+      ? (current_period_spent / totalBudget) * 100
+      : 0;
   const spentPercentage =
     totalBudget && current_period_spent
       ? Math.min((current_period_spent / totalBudget) * 100, 100)
@@ -254,15 +258,15 @@ export function BudgetCard({
               className="h-4"
               backgroundColor={
                 (totalBudget === 0 && (current_period_spent || 0) > 0) ||
-                spentPercentage > 100
+                actualPercentage > 100
                   ? "rgb(239 68 68)"
                   : "rgb(75 85 99)" // Subtle dark gray that matches the theme
               }
               indicatorColor={
                 (totalBudget === 0 && (current_period_spent || 0) > 0) ||
-                spentPercentage > 100
+                actualPercentage > 100
                   ? "rgb(239 68 68)"
-                  : spentPercentage >= yellowThreshold
+                  : actualPercentage >= yellowThreshold
                   ? "rgb(234 179 8)"
                   : "rgb(34 197 94)"
               }
@@ -277,7 +281,7 @@ export function BudgetCard({
                   : "No spending data"}
               </span>
               <span
-                className={getProgressColor(spentPercentage).replace(
+                className={getProgressColor(actualPercentage).replace(
                   "bg-",
                   "text-"
                 )}
