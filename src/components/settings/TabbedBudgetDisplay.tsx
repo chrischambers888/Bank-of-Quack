@@ -20,6 +20,7 @@ import {
   Sector,
   Category,
   SelectedMonth,
+  Transaction,
 } from "@/types";
 import {
   Plus,
@@ -67,6 +68,11 @@ interface TabbedBudgetDisplayProps {
   deleteTransaction: (id: string) => Promise<void>;
   handleSetEditingTransaction: (transaction: any) => void;
   onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
+  onTabChange?: (tab: string) => void;
+  allTransactions?: Transaction[];
+  incomeImageUrl?: string | null;
+  settlementImageUrl?: string | null;
+  reimbursementImageUrl?: string | null;
 }
 
 export function TabbedBudgetDisplay({
@@ -87,6 +93,11 @@ export function TabbedBudgetDisplay({
   deleteTransaction,
   handleSetEditingTransaction,
   onToggleExclude,
+  onTabChange,
+  allTransactions = [],
+  incomeImageUrl,
+  settlementImageUrl,
+  reimbursementImageUrl,
 }: TabbedBudgetDisplayProps) {
   const { yellowThreshold, redThreshold } = useBudgetSettings();
   const [activeTab, setActiveTab] = useState("monthly");
@@ -268,6 +279,20 @@ export function TabbedBudgetDisplay({
       )
       .order("date", { ascending: false });
 
+    // Find reimbursements that reimburse these transactions
+    const relevantExpenseIds = (transactions || []).map((t) => t.id);
+    const relevantReimbursements = allTransactions.filter(
+      (t) =>
+        t.transaction_type === "reimbursement" &&
+        t.reimburses_transaction_id &&
+        relevantExpenseIds.includes(t.reimburses_transaction_id)
+    );
+
+    const finalTransactions = [
+      ...(transactions || []),
+      ...relevantReimbursements,
+    ];
+
     setModalData({
       type: "sector",
       data: {
@@ -276,7 +301,7 @@ export function TabbedBudgetDisplay({
         sectorCategories,
         sectorBudgets,
       },
-      transactions: transactions || [],
+      transactions: finalTransactions,
     });
   };
 
@@ -302,13 +327,27 @@ export function TabbedBudgetDisplay({
       )
       .order("date", { ascending: false });
 
+    // Find reimbursements that reimburse these transactions
+    const relevantExpenseIds = (transactions || []).map((t) => t.id);
+    const relevantReimbursements = allTransactions.filter(
+      (t) =>
+        t.transaction_type === "reimbursement" &&
+        t.reimburses_transaction_id &&
+        relevantExpenseIds.includes(t.reimburses_transaction_id)
+    );
+
+    const finalTransactions = [
+      ...(transactions || []),
+      ...relevantReimbursements,
+    ];
+
     setModalData({
       type: "category",
       data: {
         budgetSummary,
         category,
       },
-      transactions: transactions || [],
+      transactions: finalTransactions,
     });
   };
 
@@ -336,9 +375,23 @@ export function TabbedBudgetDisplay({
         )
         .order("date", { ascending: false });
 
+      // Find reimbursements that reimburse these transactions
+      const relevantExpenseIds = (transactions || []).map((t) => t.id);
+      const relevantReimbursements = allTransactions.filter(
+        (t) =>
+          t.transaction_type === "reimbursement" &&
+          t.reimburses_transaction_id &&
+          relevantExpenseIds.includes(t.reimburses_transaction_id)
+      );
+
+      const finalTransactions = [
+        ...(transactions || []),
+        ...relevantReimbursements,
+      ];
+
       setModalData({
         ...modalData,
-        transactions: transactions || [],
+        transactions: finalTransactions,
       });
     } else {
       const budgetSummary = modalData.data.budgetSummary;
@@ -360,9 +413,23 @@ export function TabbedBudgetDisplay({
         )
         .order("date", { ascending: false });
 
+      // Find reimbursements that reimburse these transactions
+      const relevantExpenseIds = (transactions || []).map((t) => t.id);
+      const relevantReimbursements = allTransactions.filter(
+        (t) =>
+          t.transaction_type === "reimbursement" &&
+          t.reimburses_transaction_id &&
+          relevantExpenseIds.includes(t.reimburses_transaction_id)
+      );
+
+      const finalTransactions = [
+        ...(transactions || []),
+        ...relevantReimbursements,
+      ];
+
       setModalData({
         ...modalData,
-        transactions: transactions || [],
+        transactions: finalTransactions,
       });
     }
   };
@@ -473,7 +540,14 @@ export function TabbedBudgetDisplay({
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value);
+          onTabChange?.(value);
+        }}
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="monthly" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -694,8 +768,7 @@ export function TabbedBudgetDisplay({
                                       : "text-green-600"
                                   }`}
                                 >
-                                  {sectorOverUnder >= 0 ? "+" : ""}
-                                  {formatCurrency(sectorOverUnder)}
+                                  {formatCurrency(Math.abs(sectorOverUnder))}
                                 </td>
                                 <td className="text-right py-3 px-4">
                                   <div className="flex items-center justify-end space-x-2">
@@ -895,8 +968,9 @@ export function TabbedBudgetDisplay({
                                                     : "text-green-600"
                                                 }`}
                                               >
-                                                {overUnder >= 0 ? "+" : ""}
-                                                {formatCurrency(overUnder)}
+                                                {formatCurrency(
+                                                  Math.abs(overUnder)
+                                                )}
                                               </td>
                                               <td className="text-right py-2 px-4">
                                                 <div className="flex items-center justify-end space-x-2">
@@ -955,7 +1029,7 @@ export function TabbedBudgetDisplay({
                                                     size="sm"
                                                     variant="ghost"
                                                     onClick={() =>
-                                                      handleDeleteTransaction(
+                                                      onDeleteBudget(
                                                         budgetSummary.category_id
                                                       )
                                                     }
@@ -1077,8 +1151,7 @@ export function TabbedBudgetDisplay({
                                       : "text-green-600"
                                   }`}
                                 >
-                                  {totalOverUnder >= 0 ? "+" : ""}
-                                  {formatCurrency(totalOverUnder)}
+                                  {formatCurrency(Math.abs(totalOverUnder))}
                                 </span>
                               </td>
                               <td className="text-right py-3 px-4">
@@ -1181,8 +1254,7 @@ export function TabbedBudgetDisplay({
                                           : "text-green-600"
                                       }`}
                                     >
-                                      {overUnder >= 0 ? "+" : ""}
-                                      {formatCurrency(overUnder)}
+                                      {formatCurrency(Math.abs(overUnder))}
                                     </td>
                                     <td className="text-right py-2 px-4">
                                       <div className="flex items-center justify-end space-x-2">
@@ -1224,7 +1296,7 @@ export function TabbedBudgetDisplay({
                                           size="sm"
                                           variant="ghost"
                                           onClick={() =>
-                                            handleDeleteTransaction(
+                                            onDeleteBudget(
                                               budgetSummary.category_id
                                             )
                                           }
@@ -1467,8 +1539,7 @@ export function TabbedBudgetDisplay({
                                       : "text-green-600"
                                   }`}
                                 >
-                                  {sectorOverUnder >= 0 ? "+" : ""}
-                                  {formatCurrency(sectorOverUnder)}
+                                  {formatCurrency(Math.abs(sectorOverUnder))}
                                 </p>
                               </div>
                             </div>
@@ -1612,7 +1683,7 @@ export function TabbedBudgetDisplay({
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() =>
-                                                  handleDeleteTransaction(
+                                                  onDeleteBudget(
                                                     budgetSummary.category_id
                                                   )
                                                 }
@@ -1642,8 +1713,9 @@ export function TabbedBudgetDisplay({
                                                     : "text-green-600"
                                                 }`}
                                               >
-                                                {overUnder >= 0 ? "+" : ""}
-                                                {formatCurrency(overUnder)}
+                                                {formatCurrency(
+                                                  Math.abs(overUnder)
+                                                )}
                                               </p>
                                             </div>
                                           </div>
@@ -1810,8 +1882,7 @@ export function TabbedBudgetDisplay({
                                     : "text-green-600"
                                 }`}
                               >
-                                {totalOverUnder >= 0 ? "+" : ""}
-                                {formatCurrency(totalOverUnder)}
+                                {formatCurrency(Math.abs(totalOverUnder))}
                               </p>
                             </div>
                           </div>
@@ -1910,8 +1981,7 @@ export function TabbedBudgetDisplay({
                                             : "text-green-600"
                                         }`}
                                       >
-                                        {overUnder >= 0 ? "+" : ""}
-                                        {formatCurrency(overUnder)}
+                                        {formatCurrency(Math.abs(overUnder))}
                                       </p>
                                       <div className="flex items-center space-x-2 mt-1">
                                         <div className="w-12 bg-gray-200 rounded-full h-1">
@@ -2237,6 +2307,7 @@ export function TabbedBudgetDisplay({
                   user1AvatarUrl={user1AvatarUrl}
                   user2AvatarUrl={user2AvatarUrl}
                   selectedMonth={selectedMonth}
+                  hideTransactionsButton={true}
                 />
               )}
 
@@ -2253,10 +2324,13 @@ export function TabbedBudgetDisplay({
                     setModalData(null); // Close the modal
                     // The navigation will be handled by the handleSetEditingTransaction function
                   }}
-                  allTransactions={modalData.transactions}
+                  allTransactions={allTransactions}
                   variant="dialog"
                   showExcludeOption={true}
                   onToggleExclude={onToggleExclude}
+                  incomeImageUrl={incomeImageUrl}
+                  settlementImageUrl={settlementImageUrl}
+                  reimbursementImageUrl={reimbursementImageUrl}
                 />
               </div>
             </div>

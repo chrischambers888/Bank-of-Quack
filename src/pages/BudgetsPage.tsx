@@ -61,6 +61,9 @@ import {
   MoreHorizontal,
   Copy,
   RotateCcw,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -71,6 +74,7 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAppData } from "@/hooks/useAppData";
 import { useBudgetMonthNavigation } from "@/hooks/useBudgetMonthNavigation";
+import { parseInputDateLocal } from "@/utils/dateUtils";
 import {
   calculateCategorySpent,
   calculateCategoryUser1Spent,
@@ -188,6 +192,7 @@ export function BudgetsPage() {
     userNames,
     deleteTransaction,
   } = useAppData();
+
   const {
     selectedMonth,
     changeMonth,
@@ -198,6 +203,9 @@ export function BudgetsPage() {
 
   // Get the App context properly like DashboardPage does
   const appContext = useOutletContext<any>();
+  const incomeImageUrl = appContext?.incomeImageUrl;
+  const settlementImageUrl = appContext?.settlementImageUrl;
+  const reimbursementImageUrl = appContext?.reimbursementImageUrl;
   // Create a simple handleSetEditingTransaction function that navigates to edit URL
   const handleSetEditingTransaction = (transaction: any) => {
     // Navigate to the edit URL with the transaction ID
@@ -247,6 +255,43 @@ export function BudgetsPage() {
     }
   };
 
+  const toggleExpandedExcludedTransaction = (transactionId: string) => {
+    setExpandedExcludedTransactions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(transactionId)) {
+        newSet.delete(transactionId);
+      } else {
+        newSet.add(transactionId);
+      }
+      return newSet;
+    });
+  };
+
+  const getSplitTypeLabel = (splitType: string) => {
+    if (!userNames || userNames.length < 2) {
+      switch (splitType) {
+        case "splitEqually":
+          return "Split Equally";
+        case "user1_only":
+          return "For User 1 Only";
+        case "user2_only":
+          return "For User 2 Only";
+        default:
+          return splitType || "N/A";
+      }
+    }
+    switch (splitType) {
+      case "splitEqually":
+        return "Split Equally";
+      case "user1_only":
+        return `For ${userNames[0]} Only`;
+      case "user2_only":
+        return `For ${userNames[1]} Only`;
+      default:
+        return splitType || "N/A";
+    }
+  };
+
   const [budgetSummaries, setBudgetSummaries] = useState<BudgetSummary[]>([]);
   const [sectorBudgetSummaries, setSectorBudgetSummaries] = useState<
     SectorBudgetSummary[]
@@ -284,6 +329,9 @@ export function BudgetsPage() {
   const [copyFromMonthHasData, setCopyFromMonthHasData] = useState(false);
   const [showMainCalendar, setShowMainCalendar] = useState(false);
   const [showCopyCalendar, setShowCopyCalendar] = useState(false);
+  const [expandedExcludedTransactions, setExpandedExcludedTransactions] =
+    useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState("monthly");
 
   const [tempMainSelection, setTempMainSelection] = useState<SelectedMonth>({
     year: 0,
@@ -672,13 +720,12 @@ export function BudgetsPage() {
       const { error: copySectorError } = await supabase.rpc(
         "copy_sector_budgets_from_month",
         {
-          p_from_year: selectedMonth.year,
-          p_from_month:
-            selectedMonth.month - 1 === 0 ? 12 : selectedMonth.month - 1,
-          p_from_year_adjusted:
+          p_from_year:
             selectedMonth.month - 1 === 0
               ? selectedMonth.year - 1
               : selectedMonth.year,
+          p_from_month:
+            selectedMonth.month - 1 === 0 ? 12 : selectedMonth.month - 1,
           p_to_year: selectedMonth.year,
           p_to_month: selectedMonth.month,
         }
@@ -729,7 +776,6 @@ export function BudgetsPage() {
         {
           p_from_year: copyFromMonth.year,
           p_from_month: copyFromMonth.month,
-          p_from_year_adjusted: copyFromMonth.year,
           p_to_year: selectedMonth.year,
           p_to_month: selectedMonth.month,
         }
@@ -872,6 +918,24 @@ export function BudgetsPage() {
     .toString()
     .padStart(2, "0")}`;
 
+  // Get excluded transactions for the selected month
+  const getExcludedTransactions = () => {
+    const startDate = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+    const endDate = new Date(selectedMonth.year, selectedMonth.month, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    return transactions.filter((t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    });
+  };
+
+  const excludedTransactions = getExcludedTransactions();
+
   // Create proper month name for any month (not just the last 24)
   const selectedMonthName = (() => {
     const date = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
@@ -978,21 +1042,25 @@ export function BudgetsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => setShowCopyDialog(true)}
-                    disabled={isCopyingFromMonth}
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy from Another Month
-                  </DropdownMenuItem>
-                  {isFutureMonth && (
-                    <DropdownMenuItem
-                      onClick={handleCarryForwardBudgets}
-                      disabled={isCarryingForward}
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Carry Forward Current Budgets
-                    </DropdownMenuItem>
+                  {!hasBudgetData && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => setShowCopyDialog(true)}
+                        disabled={isCopyingFromMonth}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy from Another Month
+                      </DropdownMenuItem>
+                      {isFutureMonth && (
+                        <DropdownMenuItem
+                          onClick={handleCarryForwardBudgets}
+                          disabled={isCarryingForward}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Carry Forward Current Budgets
+                        </DropdownMenuItem>
+                      )}
+                    </>
                   )}
 
                   <DropdownMenuItem
@@ -1081,7 +1149,132 @@ export function BudgetsPage() {
           deleteTransaction={handleDeleteTransaction}
           handleSetEditingTransaction={handleSetEditingTransaction}
           onToggleExclude={handleToggleExclude}
+          onTabChange={setActiveTab}
+          allTransactions={transactions}
+          incomeImageUrl={incomeImageUrl}
+          settlementImageUrl={settlementImageUrl}
+          reimbursementImageUrl={reimbursementImageUrl}
         />
+      )}
+
+      {/* Excluded Transactions Section - Only show on monthly tab */}
+      {excludedTransactions.length > 0 && activeTab === "monthly" && (
+        <Card className="bg-gradient-to-b from-[#004D40] to-[#26A69A] border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <EyeOff className="h-5 w-5 text-muted-foreground" />
+              Excluded Transactions - {selectedMonthName}
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              These transactions are excluded from budget calculations for this
+              month
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {excludedTransactions.map((transaction) => {
+                const category = categories.find(
+                  (c) => c.id === transaction.category_id
+                );
+                const isExpanded = expandedExcludedTransactions.has(
+                  transaction.id
+                );
+                return (
+                  <div
+                    key={transaction.id}
+                    className="bg-card/50 rounded-lg border border-border overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {category?.image_url && (
+                          <img
+                            src={category.image_url}
+                            alt={category.name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium text-foreground">
+                            {transaction.description}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(transaction.date).toLocaleDateString()}
+                            <span className="hidden md:inline">
+                              {" "}
+                              •{" "}
+                              {getSplitTypeLabel(transaction.split_type || "")}
+                              {category && ` • ${category.name}`}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-red-500 font-medium">
+                          -${Math.abs(transaction.amount).toFixed(2)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            toggleExpandedExcludedTransaction(transaction.id)
+                          }
+                          className="md:hidden p-1"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleToggleExclude(transaction.id, false)
+                          }
+                          className="text-xs hidden md:inline-flex"
+                        >
+                          Include
+                        </Button>
+                      </div>
+                    </div>
+                    {/* Mobile expanded section */}
+                    <div
+                      className={`md:hidden ${isExpanded ? "block" : "hidden"}`}
+                    >
+                      <div className="px-3 pb-3 border-t border-border/50">
+                        <div className="pt-3 space-y-2">
+                          <div className="text-sm text-muted-foreground">
+                            <span className="font-medium">Split type:</span>{" "}
+                            {getSplitTypeLabel(transaction.split_type || "")}
+                          </div>
+                          {category && (
+                            <div className="text-sm text-muted-foreground">
+                              <span className="font-medium">Category:</span>{" "}
+                              {category.name}
+                            </div>
+                          )}
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleToggleExclude(transaction.id, false)
+                              }
+                              className="text-xs w-full"
+                            >
+                              Include Transaction
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Budget Form Dialogs - Always Available */}

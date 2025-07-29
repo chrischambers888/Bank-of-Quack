@@ -33,6 +33,7 @@ interface BudgetCardProps {
   user1AvatarUrl?: string | null;
   user2AvatarUrl?: string | null;
   selectedMonth?: SelectedMonth;
+  hideTransactionsButton?: boolean;
 }
 
 export function BudgetCard({
@@ -43,6 +44,7 @@ export function BudgetCard({
   user1AvatarUrl,
   user2AvatarUrl,
   selectedMonth,
+  hideTransactionsButton = false,
 }: BudgetCardProps) {
   const [userNames, setUserNames] = useState({
     user1: "User 1",
@@ -197,14 +199,16 @@ export function BudgetCard({
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleViewTransactions}
-              title="View transactions"
-            >
-              <Receipt className="h-4 w-4" />
-            </Button>
+            {!hideTransactionsButton && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleViewTransactions}
+                title="View transactions"
+              >
+                <Receipt className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -234,14 +238,6 @@ export function BudgetCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Budget Configuration */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Monthly Budget:</span>
-            <span className="font-medium">{formatCurrency(totalBudget)}</span>
-          </div>
-        </div>
-
         {/* Current Period Progress */}
         {hasBudget && (
           <div className="space-y-2">
@@ -260,7 +256,7 @@ export function BudgetCard({
                 (totalBudget === 0 && (current_period_spent || 0) > 0) ||
                 spentPercentage >= redThreshold
                   ? "rgb(239 68 68)"
-                  : undefined
+                  : "rgb(75 85 99)" // Subtle dark gray that matches the theme
               }
               indicatorColor={
                 (totalBudget === 0 && (current_period_spent || 0) > 0) ||
@@ -286,13 +282,18 @@ export function BudgetCard({
                   "text-"
                 )}
               >
-                {formatCurrency(
-                  totalBudget === 0
-                    ? -(current_period_spent || 0) // Show negative amount for zero budgets
-                    : totalBudget
-                    ? totalBudget - (current_period_spent || 0)
-                    : 0
-                )}
+                {(() => {
+                  const remaining =
+                    totalBudget === 0
+                      ? -(current_period_spent || 0) // Show negative amount for zero budgets
+                      : totalBudget
+                      ? totalBudget - (current_period_spent || 0)
+                      : 0;
+                  const isOver = remaining < 0;
+                  return `${formatCurrency(Math.abs(remaining))} ${
+                    isOver ? "over" : "under"
+                  }`;
+                })()}
               </span>
             </div>
 
@@ -313,7 +314,7 @@ export function BudgetCard({
                       ` / ${formatCurrency(user2_amount)}`}
                   </span>
                 </div>
-                <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
                   {/* User 1 Progress */}
                   <div
                     className="absolute left-0 h-full transition-all duration-300"

@@ -179,20 +179,6 @@ export function SectorBudgetCard({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Budget Amount */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Sector Budget</span>
-          </div>
-          <div className="text-right">
-            <div className="font-semibold">${getBudgetAmount().toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground">
-              {budget_type === "absolute" ? "Absolute" : "Split"}
-            </div>
-          </div>
-        </div>
-
         {/* Category Budgets Total - Only show for manual budgets */}
         {!auto_rollup && (
           <div className="flex items-center justify-between">
@@ -229,7 +215,7 @@ export function SectorBudgetCard({
                     (current_period_spent || 0) > 0) ||
                   getProgressPercentage() >= redThreshold
                     ? "rgb(239 68 68)"
-                    : undefined
+                    : "rgb(75 85 99)" // Subtle dark gray that matches the theme
                 }
                 indicatorColor={
                   (current_period_budget === 0 &&
@@ -250,13 +236,18 @@ export function SectorBudgetCard({
                     : "No spending data"}
                 </span>
                 <span className={getProgressColor().replace("bg-", "text-")}>
-                  {formatCurrency(
-                    current_period_budget === 0
-                      ? -(current_period_spent || 0) // Show negative amount for zero budgets
-                      : current_period_budget
-                      ? current_period_budget - (current_period_spent || 0)
-                      : 0
-                  )}
+                  {(() => {
+                    const remaining =
+                      current_period_budget === 0
+                        ? -(current_period_spent || 0) // Show negative amount for zero budgets
+                        : current_period_budget
+                        ? current_period_budget - (current_period_spent || 0)
+                        : 0;
+                    const isOver = remaining < 0;
+                    return `${formatCurrency(Math.abs(remaining))} ${
+                      isOver ? "over" : "under"
+                    }`;
+                  })()}
                 </span>
               </div>
 
@@ -277,7 +268,7 @@ export function SectorBudgetCard({
                         ` / ${formatCurrency(user2_amount)}`}
                     </span>
                   </div>
-                  <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
                     {/* User 1 Progress */}
                     <div
                       className="absolute left-0 h-full transition-all duration-300"
