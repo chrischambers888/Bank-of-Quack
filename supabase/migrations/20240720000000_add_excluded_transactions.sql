@@ -24,8 +24,9 @@ select t.id,
 from public.transactions t
 left join public.categories c on t.category_id = c.id;
 
--- Update the get_budget_summary_for_month function to exclude transactions
-create or replace function public.get_budget_summary_for_month(
+-- Drop and recreate the get_budget_summary_for_month function to exclude transactions
+drop function if exists public.get_budget_summary_for_month(integer, integer);
+create function public.get_budget_summary_for_month(
   p_year integer,
   p_month integer
 )
@@ -233,8 +234,9 @@ begin
 end;
 $$;
 
--- Update the get_sector_budget_summary_for_month function to exclude transactions
-create or replace function public.get_sector_budget_summary_for_month(
+-- Drop and recreate the get_sector_budget_summary_for_month function to exclude transactions
+drop function if exists public.get_sector_budget_summary_for_month(integer, integer);
+create function public.get_sector_budget_summary_for_month(
   p_year integer,
   p_month integer
 )
