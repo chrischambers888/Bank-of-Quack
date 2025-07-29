@@ -3,13 +3,11 @@ import { supabase } from "@/supabaseClient";
 
 interface BudgetSettings {
   yellowThreshold: number;
-  redThreshold: number;
   isLoading: boolean;
 }
 
 export function useBudgetSettings(): BudgetSettings {
   const [yellowThreshold, setYellowThreshold] = useState(75);
-  const [redThreshold, setRedThreshold] = useState(90);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -24,17 +22,8 @@ export function useBudgetSettings(): BudgetSettings {
         .eq("key", "budget_yellow_threshold")
         .single();
 
-      const { data: redData } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "budget_red_threshold")
-        .single();
-
       if (yellowData?.value) {
         setYellowThreshold(parseInt(yellowData.value));
-      }
-      if (redData?.value) {
-        setRedThreshold(parseInt(redData.value));
       }
     } catch (error) {
       console.error("Error loading budget settings:", error);
@@ -46,7 +35,6 @@ export function useBudgetSettings(): BudgetSettings {
 
   return {
     yellowThreshold,
-    redThreshold,
     isLoading,
   };
 } 

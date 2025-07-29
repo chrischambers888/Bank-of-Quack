@@ -53,7 +53,7 @@ export function BudgetCard({
   const [showTransactions, setShowTransactions] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
-  const { yellowThreshold, redThreshold } = useBudgetSettings();
+  const { yellowThreshold } = useBudgetSettings();
 
   useEffect(() => {
     // Load user names from app settings
@@ -116,7 +116,7 @@ export function BudgetCard({
     // For zero budgets, any spending should be red
     if (totalBudget === 0 && (current_period_spent || 0) > 0)
       return "bg-red-500";
-    if (percentage >= redThreshold) return "bg-red-500";
+    if (percentage > 100) return "bg-red-500";
     if (percentage >= yellowThreshold) return "bg-yellow-500";
     return "bg-green-500";
   };
@@ -254,13 +254,13 @@ export function BudgetCard({
               className="h-4"
               backgroundColor={
                 (totalBudget === 0 && (current_period_spent || 0) > 0) ||
-                spentPercentage >= redThreshold
+                spentPercentage > 100
                   ? "rgb(239 68 68)"
                   : "rgb(75 85 99)" // Subtle dark gray that matches the theme
               }
               indicatorColor={
                 (totalBudget === 0 && (current_period_spent || 0) > 0) ||
-                spentPercentage >= redThreshold
+                spentPercentage > 100
                   ? "rgb(239 68 68)"
                   : spentPercentage >= yellowThreshold
                   ? "rgb(234 179 8)"

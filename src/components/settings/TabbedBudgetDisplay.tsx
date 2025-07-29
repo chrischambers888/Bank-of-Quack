@@ -99,7 +99,7 @@ export function TabbedBudgetDisplay({
   settlementImageUrl,
   reimbursementImageUrl,
 }: TabbedBudgetDisplayProps) {
-  const { yellowThreshold, redThreshold } = useBudgetSettings();
+  const { yellowThreshold } = useBudgetSettings();
   const [activeTab, setActiveTab] = useState("monthly");
   const [expandedSectors, setExpandedSectors] = useState<Set<string>>(
     new Set()
@@ -772,15 +772,23 @@ export function TabbedBudgetDisplay({
                                 </td>
                                 <td className="text-right py-3 px-4">
                                   <div className="flex items-center justify-end space-x-2">
-                                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className={`w-16 rounded-full h-2 ${
+                                        sectorPercentage === 0
+                                          ? "bg-gray-600"
+                                          : "bg-gray-200"
+                                      }`}
+                                    >
                                       <div
                                         className={`h-2 rounded-full transition-all duration-300 ${
-                                          sectorPercentage >= redThreshold
+                                          sectorPercentage > 100
                                             ? "bg-red-500"
                                             : sectorPercentage >=
                                               yellowThreshold
                                             ? "bg-yellow-500"
-                                            : "bg-green-500"
+                                            : sectorPercentage > 0
+                                            ? "bg-green-500"
+                                            : "bg-gray-600"
                                         }`}
                                         style={{
                                           width: `${Math.min(
@@ -974,16 +982,23 @@ export function TabbedBudgetDisplay({
                                               </td>
                                               <td className="text-right py-2 px-4">
                                                 <div className="flex items-center justify-end space-x-2">
-                                                  <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                                                  <div
+                                                    className={`w-12 rounded-full h-1.5 ${
+                                                      percentage === 0
+                                                        ? "bg-gray-600"
+                                                        : "bg-gray-200"
+                                                    }`}
+                                                  >
                                                     <div
                                                       className={`h-1.5 rounded-full transition-all duration-300 ${
-                                                        percentage >=
-                                                        redThreshold
+                                                        percentage > 100
                                                           ? "bg-red-500"
                                                           : percentage >=
                                                             yellowThreshold
                                                           ? "bg-yellow-500"
-                                                          : "bg-green-500"
+                                                          : percentage > 0
+                                                          ? "bg-green-500"
+                                                          : "bg-gray-600"
                                                       }`}
                                                       style={{
                                                         width: `${Math.min(
@@ -1156,14 +1171,22 @@ export function TabbedBudgetDisplay({
                               </td>
                               <td className="text-right py-3 px-4">
                                 <div className="flex items-center justify-end space-x-2">
-                                  <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`w-16 rounded-full h-2 ${
+                                      totalPercentage === 0
+                                        ? "bg-gray-600"
+                                        : "bg-gray-200"
+                                    }`}
+                                  >
                                     <div
                                       className={`h-2 rounded-full transition-all duration-300 ${
-                                        totalPercentage >= redThreshold
+                                        totalPercentage > 100
                                           ? "bg-red-500"
                                           : totalPercentage >= yellowThreshold
                                           ? "bg-yellow-500"
-                                          : "bg-green-500"
+                                          : totalPercentage > 0
+                                          ? "bg-green-500"
+                                          : "bg-gray-600"
                                       }`}
                                       style={{
                                         width: `${Math.min(
@@ -1261,7 +1284,7 @@ export function TabbedBudgetDisplay({
                                         <div className="w-12 bg-gray-200 rounded-full h-1.5">
                                           <div
                                             className={`h-1.5 rounded-full transition-all duration-300 ${
-                                              percentage >= redThreshold
+                                              percentage > 100
                                                 ? "bg-red-500"
                                                 : percentage >= yellowThreshold
                                                 ? "bg-yellow-500"
@@ -1559,7 +1582,7 @@ export function TabbedBudgetDisplay({
                               >
                                 <div
                                   className={`h-2 rounded-full transition-all duration-300 ${
-                                    sectorPercentage >= redThreshold
+                                    sectorPercentage > 100
                                       ? "bg-red-500"
                                       : sectorPercentage >= yellowThreshold
                                       ? "bg-yellow-500"
@@ -1745,7 +1768,7 @@ export function TabbedBudgetDisplay({
                                             >
                                               <div
                                                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                                                  percentage >= redThreshold
+                                                  percentage > 100
                                                     ? "bg-red-500"
                                                     : percentage >=
                                                       yellowThreshold
@@ -1920,7 +1943,7 @@ export function TabbedBudgetDisplay({
                             >
                               <div
                                 className={`h-2 rounded-full transition-all duration-300 ${
-                                  totalPercentage >= redThreshold
+                                  totalPercentage > 100
                                     ? "bg-red-500"
                                     : totalPercentage >= yellowThreshold
                                     ? "bg-yellow-500"
@@ -2019,7 +2042,7 @@ export function TabbedBudgetDisplay({
                                         >
                                           <div
                                             className={`h-1 rounded-full transition-all duration-300 ${
-                                              percentage >= redThreshold
+                                              percentage > 100
                                                 ? "bg-red-500"
                                                 : percentage >= yellowThreshold
                                                 ? "bg-yellow-500"

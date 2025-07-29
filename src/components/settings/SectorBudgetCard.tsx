@@ -39,7 +39,7 @@ export function SectorBudgetCard({
     user1: "User 1",
     user2: "User 2",
   });
-  const { yellowThreshold, redThreshold } = useBudgetSettings();
+  const { yellowThreshold } = useBudgetSettings();
 
   useEffect(() => {
     // Load user names from app settings
@@ -105,7 +105,7 @@ export function SectorBudgetCard({
     // For zero budgets, any spending should be red
     if (current_period_budget === 0 && (current_period_spent || 0) > 0)
       return "bg-red-500";
-    if (percentage >= redThreshold) return "bg-red-500";
+    if (percentage > 100) return "bg-red-500";
     if (percentage >= yellowThreshold) return "bg-yellow-500";
     return "bg-green-500";
   };
@@ -248,14 +248,14 @@ export function SectorBudgetCard({
                 backgroundColor={
                   (current_period_budget === 0 &&
                     (current_period_spent || 0) > 0) ||
-                  getProgressPercentage() >= redThreshold
+                  getProgressPercentage() > 100
                     ? "rgb(239 68 68)"
                     : "rgb(75 85 99)" // Subtle dark gray that matches the theme
                 }
                 indicatorColor={
                   (current_period_budget === 0 &&
                     (current_period_spent || 0) > 0) ||
-                  getProgressPercentage() >= redThreshold
+                  getProgressPercentage() > 100
                     ? "rgb(239 68 68)"
                     : getProgressPercentage() >= yellowThreshold
                     ? "rgb(234 179 8)"

@@ -20,7 +20,6 @@ interface BudgetSettingsProps {
 
 export function BudgetSettings({ onSave }: BudgetSettingsProps) {
   const [yellowThreshold, setYellowThreshold] = useState(75);
-  const [redThreshold, setRedThreshold] = useState(90);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -37,17 +36,8 @@ export function BudgetSettings({ onSave }: BudgetSettingsProps) {
         .eq("key", "budget_yellow_threshold")
         .single();
 
-      const { data: redData } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "budget_red_threshold")
-        .single();
-
       if (yellowData?.value) {
         setYellowThreshold(parseInt(yellowData.value));
-      }
-      if (redData?.value) {
-        setRedThreshold(parseInt(redData.value));
       }
     } catch (error) {
       console.error("Error loading budget settings:", error);
@@ -69,14 +59,6 @@ export function BudgetSettings({ onSave }: BudgetSettingsProps) {
 
       if (yellowError) throw yellowError;
 
-      // Save red threshold
-      const { error: redError } = await supabase.from("app_settings").upsert({
-        key: "budget_red_threshold",
-        value: redThreshold.toString(),
-      });
-
-      if (redError) throw redError;
-
       onSave?.();
     } catch (error) {
       console.error("Error saving budget settings:", error);
@@ -87,17 +69,13 @@ export function BudgetSettings({ onSave }: BudgetSettingsProps) {
   };
 
   const getProgressColor = (percentage: number) => {
-    if (percentage >= redThreshold) return "bg-red-500";
+    if (percentage > 100) return "bg-red-500";
     if (percentage >= yellowThreshold) return "bg-yellow-500";
     return "bg-green-500";
   };
 
   const validateThresholds = () => {
-    return (
-      yellowThreshold < redThreshold &&
-      yellowThreshold > 0 &&
-      redThreshold <= 100
-    );
+    return yellowThreshold > 0 && yellowThreshold <= 100;
   };
 
   if (isLoading) {
@@ -135,52 +113,25 @@ export function BudgetSettings({ onSave }: BudgetSettingsProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Threshold Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
             <Label htmlFor="yellow-threshold">Yellow Threshold (%)</Label>
             <Input
               id="yellow-threshold"
               type="number"
               min="1"
-              max="99"
+              max="100"
               value={yellowThreshold}
               onChange={(e) =>
                 setYellowThreshold(parseInt(e.target.value) || 0)
               }
-              className={
-                yellowThreshold >= redThreshold ? "border-red-500" : ""
-              }
             />
             <p className="text-xs text-muted-foreground">
-              Budgets will show yellow when spending reaches this percentage
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="red-threshold">Red Threshold (%)</Label>
-            <Input
-              id="red-threshold"
-              type="number"
-              min="1"
-              max="100"
-              value={redThreshold}
-              onChange={(e) => setRedThreshold(parseInt(e.target.value) || 0)}
-              className={
-                yellowThreshold >= redThreshold ? "border-red-500" : ""
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Budgets will show red when spending reaches this percentage
+              Budgets will show yellow when spending reaches this percentage.
+              Red will show when spending exceeds 100%.
             </p>
           </div>
         </div>
-
-        {/* Validation Message */}
-        {yellowThreshold >= redThreshold && (
-          <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-            Yellow threshold must be less than red threshold
-          </div>
-        )}
 
         {/* Preview */}
         <div className="space-y-4">
@@ -203,12 +154,10 @@ export function BudgetSettings({ onSave }: BudgetSettingsProps) {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Yellow (Warning)</span>
-                <span>
-                  {yellowThreshold}% - {redThreshold - 1}%
-                </span>
+                <span>{yellowThreshold}% - 100%</span>
               </div>
               <CustomProgress
-                value={yellowThreshold + (redThreshold - yellowThreshold) / 2}
+                value={yellowThreshold + (100 - yellowThreshold) / 2}
                 className="h-2"
                 indicatorColor="rgb(234 179 8)"
               />
@@ -218,10 +167,10 @@ export function BudgetSettings({ onSave }: BudgetSettingsProps) {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Red (Over Budget)</span>
-                <span>{redThreshold}% - 100%</span>
+                <span>&gt;100%</span>
               </div>
               <CustomProgress
-                value={Math.min(redThreshold + 10, 100)}
+                value={110}
                 className="h-2"
                 backgroundColor="rgb(239 68 68)"
                 indicatorColor="rgb(239 68 68)"
