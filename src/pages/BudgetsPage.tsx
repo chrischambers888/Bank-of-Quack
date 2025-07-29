@@ -252,6 +252,7 @@ export function BudgetsPage() {
     SectorBudgetSummary[]
   >([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [localSectors, setLocalSectors] = useState<Sector[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
@@ -294,14 +295,10 @@ export function BudgetsPage() {
   });
 
   useEffect(() => {
-    loadData();
-  }, [selectedMonth]);
-
-  // Debug: Log sectors when they change
-  useEffect(() => {
-    console.log("Sectors from useAppData:", sectors?.length || 0, "sectors");
-    console.log("Sectors data:", sectors);
-  }, [sectors]);
+    if (transactions.length > 0) {
+      loadData();
+    }
+  }, [selectedMonth, transactions]);
 
   useEffect(() => {
     if (showCopyDialog) {
@@ -324,6 +321,11 @@ export function BudgetsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
+      // Wait for transactions to be loaded from useAppData
+      if (transactions.length === 0) {
+        return; // Exit early if transactions aren't loaded yet
+      }
+
       // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("categories")
@@ -331,7 +333,11 @@ export function BudgetsPage() {
         .order("name");
 
       if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
+      const categories = categoriesData || [];
+      setCategories(categories);
+
+      // Use sectors from useAppData instead of loading from database
+      setLocalSectors(sectors);
 
       // Check if the selected month has budget data
       const monthHasData = await checkMonthHasData(
@@ -364,6 +370,7 @@ export function BudgetsPage() {
         }
 
         // Calculate budget summaries client-side
+
         const budgetSummaries = categories
           .map((category) => {
             const budget = categoryBudgetsData?.find(
@@ -423,7 +430,8 @@ export function BudgetsPage() {
         setBudgetSummaries(budgetSummaries as BudgetSummary[]);
 
         // Calculate sector budget summaries client-side
-        const sectorBudgetSummaries = sectors.map((sector) => {
+
+        const sectorBudgetSummaries = sectors.map((sector: Sector) => {
           const budget = sectorBudgetsData?.find(
             (b) => b.sector_id === sector.id
           );
@@ -525,7 +533,7 @@ export function BudgetsPage() {
     return budgetSummaries
       .filter((budgetSummary) => {
         // Check if this category belongs to the sector
-        const sector = sectors.find((s) => s.id === sectorId);
+        const sector = localSectors.find((s) => s.id === sectorId);
         return (
           sector && sector.category_ids.includes(budgetSummary.category_id)
         );
@@ -541,7 +549,9 @@ export function BudgetsPage() {
   };
 
   const handleEditSectorBudget = (sectorBudgetSummary: SectorBudgetSummary) => {
-    const sector = sectors.find((s) => s.id === sectorBudgetSummary.sector_id);
+    const sector = localSectors.find(
+      (s) => s.id === sectorBudgetSummary.sector_id
+    );
     if (sector) {
       setSelectedSector(sector);
       console.log("Setting editing sector budget:", sectorBudgetSummary);
@@ -1129,7 +1139,7 @@ export function BudgetsPage() {
                   user2_amount: summary.user2_amount,
                   auto_rollup: summary.auto_rollup,
                   category_ids:
-                    sectors.find((s) => s.id === summary.sector_id)
+                    localSectors.find((s) => s.id === summary.sector_id)
                       ?.category_ids || [],
                 }))}
               currentBudgets={budgetSummaries.map((summary) => ({

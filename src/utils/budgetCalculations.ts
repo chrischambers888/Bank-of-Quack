@@ -1,5 +1,6 @@
 // src/utils/budgetCalculations.ts
 import { Transaction, BudgetSummary, SectorBudgetSummary } from "@/types";
+import { parseInputDateLocal } from "@/utils/dateUtils";
 
 // Calculate reimbursements for an expense transaction
 const findReimbursementsForExpense = (expenseId: string, allTransactions: Transaction[]) => {
@@ -19,13 +20,22 @@ export const calculateCategorySpent = (
   month: number,
   allTransactions: Transaction[]
 ): number => {
+  // Use the same date range logic as the dashboard
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0); // Last day of the month
+  endDate.setHours(23, 59, 59, 999);
+
   const categoryTransactions = allTransactions.filter(
-    (t) =>
-      t.category_id === categoryId &&
-      t.transaction_type === "expense" &&
-      !t.excluded_from_monthly_budget &&
-      new Date(t.date).getFullYear() === year &&
-      new Date(t.date).getMonth() + 1 === month
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.category_id === categoryId &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
   );
 
   return categoryTransactions.reduce((sum, t) => {
@@ -41,13 +51,22 @@ export const calculateCategoryUser1Spent = (
   month: number,
   allTransactions: Transaction[]
 ): number => {
+  // Use the same date range logic as the dashboard
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0); // Last day of the month
+  endDate.setHours(23, 59, 59, 999);
+
   const categoryTransactions = allTransactions.filter(
-    (t) =>
-      t.category_id === categoryId &&
-      t.transaction_type === "expense" &&
-      !t.excluded_from_monthly_budget &&
-      new Date(t.date).getFullYear() === year &&
-      new Date(t.date).getMonth() + 1 === month
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.category_id === categoryId &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
   );
 
   return categoryTransactions.reduce((sum, t) => {
@@ -71,13 +90,22 @@ export const calculateCategoryUser2Spent = (
   month: number,
   allTransactions: Transaction[]
 ): number => {
+  // Use the same date range logic as the dashboard
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0); // Last day of the month
+  endDate.setHours(23, 59, 59, 999);
+
   const categoryTransactions = allTransactions.filter(
-    (t) =>
-      t.category_id === categoryId &&
-      t.transaction_type === "expense" &&
-      !t.excluded_from_monthly_budget &&
-      new Date(t.date).getFullYear() === year &&
-      new Date(t.date).getMonth() + 1 === month
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.category_id === categoryId &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
   );
 
   return categoryTransactions.reduce((sum, t) => {
@@ -101,13 +129,22 @@ export const calculateSectorSpent = (
   month: number,
   allTransactions: Transaction[]
 ): number => {
+  // Use the same date range logic as the dashboard
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0); // Last day of the month
+  endDate.setHours(23, 59, 59, 999);
+
   const sectorTransactions = allTransactions.filter(
-    (t) =>
-      sectorCategoryIds.includes(t.category_id!) &&
-      t.transaction_type === "expense" &&
-      !t.excluded_from_monthly_budget &&
-      new Date(t.date).getFullYear() === year &&
-      new Date(t.date).getMonth() + 1 === month
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        sectorCategoryIds.includes(t.category_id!) &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
   );
 
   return sectorTransactions.reduce((sum, t) => {
@@ -123,13 +160,22 @@ export const calculateSectorUser1Spent = (
   month: number,
   allTransactions: Transaction[]
 ): number => {
+  // Use the same date range logic as the dashboard
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0); // Last day of the month
+  endDate.setHours(23, 59, 59, 999);
+
   const sectorTransactions = allTransactions.filter(
-    (t) =>
-      sectorCategoryIds.includes(t.category_id!) &&
-      t.transaction_type === "expense" &&
-      !t.excluded_from_monthly_budget &&
-      new Date(t.date).getFullYear() === year &&
-      new Date(t.date).getMonth() + 1 === month
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        sectorCategoryIds.includes(t.category_id!) &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
   );
 
   return sectorTransactions.reduce((sum, t) => {
@@ -153,13 +199,22 @@ export const calculateSectorUser2Spent = (
   month: number,
   allTransactions: Transaction[]
 ): number => {
+  // Use the same date range logic as the dashboard
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0); // Last day of the month
+  endDate.setHours(23, 59, 59, 999);
+
   const sectorTransactions = allTransactions.filter(
-    (t) =>
-      sectorCategoryIds.includes(t.category_id!) &&
-      t.transaction_type === "expense" &&
-      !t.excluded_from_monthly_budget &&
-      new Date(t.date).getFullYear() === year &&
-      new Date(t.date).getMonth() + 1 === month
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        sectorCategoryIds.includes(t.category_id!) &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
   );
 
   return sectorTransactions.reduce((sum, t) => {
