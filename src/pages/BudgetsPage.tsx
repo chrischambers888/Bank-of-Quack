@@ -1188,7 +1188,7 @@ export function BudgetsPage() {
 
       {/* Excluded Transactions Section - Only show on monthly tab */}
       {excludedTransactions.length > 0 && activeTab === "monthly" && (
-        <Card className="bg-gradient-to-b from-[#004D40] to-[#26A69A] border-border">
+        <Card className="border border-white/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <EyeOff className="h-5 w-5 text-muted-foreground" />

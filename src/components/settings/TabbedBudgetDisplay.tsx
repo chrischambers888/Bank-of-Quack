@@ -2535,7 +2535,11 @@ export function TabbedBudgetDisplay({
             </div>
 
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={cancelDeleteSectorBudget}>
+              <Button
+                variant="outline"
+                onClick={cancelDeleteSectorBudget}
+                className="border-white/20 text-white hover:bg-white/10"
+              >
                 Cancel
               </Button>
               <Button variant="destructive" onClick={confirmDeleteSectorBudget}>
