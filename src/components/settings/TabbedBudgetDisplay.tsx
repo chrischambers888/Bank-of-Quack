@@ -1,56 +1,122 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { BudgetCard } from "./BudgetCard";
-import { SectorBudgetCard } from "./SectorBudgetCard";
-import { EmptyStateCard } from "./EmptyStateCard";
-import TransactionList from "@/components/TransactionList";
-import { supabase } from "@/supabaseClient";
-import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import {
-  BudgetSummary,
-  SectorBudgetSummary,
-  Sector,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BudgetForm } from "@/components/settings/BudgetForm";
+import { SectorBudgetForm } from "@/components/settings/SectorBudgetForm";
+import { BudgetCard } from "@/components/settings/BudgetCard";
+import { SectorBudgetCard } from "@/components/settings/SectorBudgetCard";
+import { EmptyStateCard } from "@/components/settings/EmptyStateCard";
+import TransactionList from "@/components/TransactionList";
+import {
   Category,
+  BudgetSummary,
+  CategoryBudget,
   SelectedMonth,
+  Sector,
+  SectorBudget,
+  SectorBudgetSummary,
   Transaction,
+  YearlyCategoryBudget,
+  YearlySectorBudget,
+  YearlyBudgetSummary,
+  YearlySectorBudgetSummary,
 } from "@/types";
+import { supabase } from "@/supabaseClient";
 import {
   Plus,
-  Building2,
   DollarSign,
   TrendingUp,
-  PieChart,
+  AlertTriangle,
   Calendar,
+  ArrowLeft,
+  ArrowRight,
+  Trash2,
+  Building2,
+  MoreHorizontal,
+  Copy,
+  RotateCcw,
+  EyeOff,
   ChevronDown,
+  ChevronUp,
+  PieChart,
+  CalendarDays,
   ChevronRight,
+  HelpCircle,
+  Edit,
   CheckCircle,
   Circle,
-  Edit,
-  Trash2,
-  AlertTriangle,
-  HelpCircle,
 } from "lucide-react";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { parseInputDateLocal } from "@/utils/dateUtils";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useBudgetSettings } from "@/hooks/useBudgetSettings";
+import {
+  calculateCategorySpent,
+  calculateCategoryUser1Spent,
+  calculateCategoryUser2Spent,
+  calculateSectorSpent,
+  calculateSectorUser1Spent,
+  calculateSectorUser2Spent,
+  calculateBudgetAmount,
+  calculateRemainingPercentage,
+  calculateRemainingAmount,
+  calculateYearlyCategorySpent,
+  calculateYearlyCategoryUser1Spent,
+  calculateYearlyCategoryUser2Spent,
+  calculateYearlySectorSpent,
+  calculateYearlySectorUser1Spent,
+  calculateYearlySectorUser2Spent,
+} from "@/utils/budgetCalculations";
 
 interface TabbedBudgetDisplayProps {
   sectors: Sector[];
@@ -79,6 +145,21 @@ interface TabbedBudgetDisplayProps {
   incomeImageUrl?: string | null;
   settlementImageUrl?: string | null;
   reimbursementImageUrl?: string | null;
+  // Yearly budget props
+  yearlyBudgetSummaries?: YearlyBudgetSummary[];
+  yearlySectorBudgetSummaries?: YearlySectorBudgetSummary[];
+  selectedYear?: number;
+  selectedMonthForProgress?: number;
+  onEditYearlyBudget?: (budget: YearlyBudgetSummary) => void;
+  onDeleteYearlyBudget?: (categoryId: string) => void;
+  onEditYearlySectorBudget?: (sectorBudget: YearlySectorBudgetSummary) => void;
+  onDeleteYearlySectorBudget?: (sectorId: string) => void;
+  onDeleteYearlySectorBudgetDirect?: (
+    sectorId: string,
+    deleteCategoryBudgets?: boolean
+  ) => Promise<void>;
+  onCreateYearlyBudget?: (category: Category) => void;
+  onCreateYearlySectorBudget?: (sector: Sector) => void;
 }
 
 export function TabbedBudgetDisplay({
@@ -105,6 +186,18 @@ export function TabbedBudgetDisplay({
   incomeImageUrl,
   settlementImageUrl,
   reimbursementImageUrl,
+  // Yearly budget props
+  yearlyBudgetSummaries = [],
+  yearlySectorBudgetSummaries = [],
+  selectedYear = new Date().getFullYear(),
+  selectedMonthForProgress = new Date().getMonth() + 1,
+  onEditYearlyBudget,
+  onDeleteYearlyBudget,
+  onEditYearlySectorBudget,
+  onDeleteYearlySectorBudget,
+  onDeleteYearlySectorBudgetDirect,
+  onCreateYearlyBudget,
+  onCreateYearlySectorBudget,
 }: TabbedBudgetDisplayProps) {
   const { yellowThreshold } = useBudgetSettings();
   const [activeTab, setActiveTab] = useState("monthly");
@@ -2445,17 +2538,254 @@ export function TabbedBudgetDisplay({
 
         {/* Yearly Tab */}
         <TabsContent value="yearly" className="space-y-6">
-          <Card>
+          {/* Yearly Budget Overview */}
+          <Card className="border border-white/20">
             <CardHeader>
-              <CardTitle className="text-lg">Yearly Budgets</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5" />
+                Yearly Budgets - {selectedYear}
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Progress through{" "}
+                {selectedMonthForProgress === 1
+                  ? "January"
+                  : selectedMonthForProgress === 2
+                  ? "February"
+                  : selectedMonthForProgress === 3
+                  ? "March"
+                  : selectedMonthForProgress === 4
+                  ? "April"
+                  : selectedMonthForProgress === 5
+                  ? "May"
+                  : selectedMonthForProgress === 6
+                  ? "June"
+                  : selectedMonthForProgress === 7
+                  ? "July"
+                  : selectedMonthForProgress === 8
+                  ? "August"
+                  : selectedMonthForProgress === 9
+                  ? "September"
+                  : selectedMonthForProgress === 10
+                  ? "October"
+                  : selectedMonthForProgress === 11
+                  ? "November"
+                  : "December"}{" "}
+                {selectedYear}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <PieChart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Coming Soon</h3>
-                <p className="text-muted-foreground">
-                  Yearly budget planning and tracking will be available soon.
-                </p>
+              {/* Yearly Budget Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-card/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-muted-foreground">
+                      Total Budget
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold">
+                    $
+                    {yearlyBudgetSummaries
+                      .reduce((sum, budget) => {
+                        const budgetAmount =
+                          budget.budget_type === "absolute"
+                            ? budget.absolute_amount || 0
+                            : (budget.user1_amount || 0) +
+                              (budget.user2_amount || 0);
+                        return sum + budgetAmount;
+                      }, 0)
+                      .toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-card/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm text-muted-foreground">Spent</span>
+                  </div>
+                  <div className="text-2xl font-bold">
+                    $
+                    {yearlyBudgetSummaries
+                      .reduce(
+                        (sum, budget) =>
+                          sum + (budget.current_period_spent || 0),
+                        0
+                      )
+                      .toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-card/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm text-muted-foreground">
+                      Remaining
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold">
+                    $
+                    {yearlyBudgetSummaries
+                      .reduce(
+                        (sum, budget) =>
+                          sum + (budget.current_period_remaining_amount || 0),
+                        0
+                      )
+                      .toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-card/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PieChart className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm text-muted-foreground">
+                      Progress
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold">
+                    {(() => {
+                      const totalBudget = yearlyBudgetSummaries.reduce(
+                        (sum, budget) => {
+                          const budgetAmount =
+                            budget.budget_type === "absolute"
+                              ? budget.absolute_amount || 0
+                              : (budget.user1_amount || 0) +
+                                (budget.user2_amount || 0);
+                          return sum + budgetAmount;
+                        },
+                        0
+                      );
+                      const totalSpent = yearlyBudgetSummaries.reduce(
+                        (sum, budget) =>
+                          sum + (budget.current_period_spent || 0),
+                        0
+                      );
+                      return totalBudget > 0
+                        ? ((totalSpent / totalBudget) * 100).toFixed(1)
+                        : "0.0";
+                    })()}
+                    %
+                  </div>
+                </div>
+              </div>
+
+              {/* Yearly Budget Categories */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Category Budgets</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {yearlyBudgetSummaries.map((budgetSummary) => {
+                    const category = categories.find(
+                      (c) => c.id === budgetSummary.category_id
+                    );
+                    if (!category) return null;
+
+                    return (
+                      <Card
+                        key={budgetSummary.category_id}
+                        className="border border-white/20"
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-3">
+                            {category.image_url && (
+                              <img
+                                src={category.image_url}
+                                alt={category.name}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-sm truncate">
+                                {category.name}
+                              </CardTitle>
+                              <p className="text-xs text-muted-foreground">
+                                {budgetSummary.budget_type === "absolute"
+                                  ? "Absolute"
+                                  : "Split"}
+                              </p>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Budget:</span>
+                              <span className="font-medium">
+                                $
+                                {budgetSummary.current_period_budget?.toFixed(
+                                  2
+                                ) || "0.00"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span>Spent:</span>
+                              <span className="font-medium">
+                                $
+                                {budgetSummary.current_period_spent?.toFixed(
+                                  2
+                                ) || "0.00"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span>Remaining:</span>
+                              <span className="font-medium">
+                                $
+                                {budgetSummary.current_period_remaining_amount?.toFixed(
+                                  2
+                                ) || "0.00"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span>Progress:</span>
+                              <span className="font-medium">
+                                {budgetSummary.current_period_remaining_percentage?.toFixed(
+                                  1
+                                ) || "0.0"}
+                                %
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-4">
+                            {onEditYearlyBudget && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  onEditYearlyBudget(budgetSummary)
+                                }
+                                className="flex-1"
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            {onDeleteYearlyBudget && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  onDeleteYearlyBudget(
+                                    budgetSummary.category_id
+                                  )
+                                }
+                                className="text-red-500 hover:text-red-400"
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* Create New Yearly Budget Button */}
+                {onCreateYearlyBudget && (
+                  <div className="mt-6">
+                    <Button
+                      onClick={() => onCreateYearlyBudget(categories[0])}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Yearly Budget
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -255,4 +255,224 @@ export const calculateRemainingAmount = (budgetAmount: number, spentAmount: numb
     return budgetAmount - spentAmount;
   }
   return null;
+};
+
+// Yearly budget calculation functions
+
+// Calculate spent amount for a category in a given year up to a specific month
+export const calculateYearlyCategorySpent = (
+  categoryId: string,
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  // Calculate spent from January to the selected month
+  const startDate = new Date(year, 0, 1); // January 1st of the year
+  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  endDate.setHours(23, 59, 59, 999);
+
+  const categoryTransactions = allTransactions.filter(
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.category_id === categoryId &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
+  );
+
+  return categoryTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    return sum + Math.max(0, t.amount - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user1 spent amount for a category in a given year up to a specific month
+export const calculateYearlyCategoryUser1Spent = (
+  categoryId: string,
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  // Calculate spent from January to the selected month
+  const startDate = new Date(year, 0, 1); // January 1st of the year
+  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  endDate.setHours(23, 59, 59, 999);
+
+  const categoryTransactions = allTransactions.filter(
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.category_id === categoryId &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
+  );
+
+  return categoryTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user1_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user2 spent amount for a category in a given year up to a specific month
+export const calculateYearlyCategoryUser2Spent = (
+  categoryId: string,
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  // Calculate spent from January to the selected month
+  const startDate = new Date(year, 0, 1); // January 1st of the year
+  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  endDate.setHours(23, 59, 59, 999);
+
+  const categoryTransactions = allTransactions.filter(
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        t.category_id === categoryId &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
+  );
+
+  return categoryTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user2_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate spent amount for a sector in a given year up to a specific month
+export const calculateYearlySectorSpent = (
+  sectorCategoryIds: string[],
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  // Calculate spent from January to the selected month
+  const startDate = new Date(year, 0, 1); // January 1st of the year
+  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  endDate.setHours(23, 59, 59, 999);
+
+  const sectorTransactions = allTransactions.filter(
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        sectorCategoryIds.includes(t.category_id!) &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
+  );
+
+  return sectorTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    return sum + Math.max(0, t.amount - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user1 spent amount for a sector in a given year up to a specific month
+export const calculateYearlySectorUser1Spent = (
+  sectorCategoryIds: string[],
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  // Calculate spent from January to the selected month
+  const startDate = new Date(year, 0, 1); // January 1st of the year
+  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  endDate.setHours(23, 59, 59, 999);
+
+  const sectorTransactions = allTransactions.filter(
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        sectorCategoryIds.includes(t.category_id!) &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
+  );
+
+  return sectorTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user1_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
+};
+
+// Calculate user2 spent amount for a sector in a given year up to a specific month
+export const calculateYearlySectorUser2Spent = (
+  sectorCategoryIds: string[],
+  year: number,
+  month: number,
+  allTransactions: Transaction[]
+): number => {
+  // Calculate spent from January to the selected month
+  const startDate = new Date(year, 0, 1); // January 1st of the year
+  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  endDate.setHours(23, 59, 59, 999);
+
+  const sectorTransactions = allTransactions.filter(
+    (t) => {
+      const transactionDate = parseInputDateLocal(t.date);
+      return (
+        sectorCategoryIds.includes(t.category_id!) &&
+        t.transaction_type === "expense" &&
+        !t.excluded_from_monthly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    }
+  );
+
+  return sectorTransactions.reduce((sum, t) => {
+    const reimbursedAmount = findReimbursementsForExpense(t.id, allTransactions);
+    let userExpense = 0;
+    
+    if (t.split_type === "user2_only") {
+      userExpense = t.amount;
+    } else if (t.split_type === "splitEqually") {
+      userExpense = t.amount / 2;
+    }
+    
+    return sum + Math.max(0, userExpense - reimbursedAmount);
+  }, 0);
 }; 

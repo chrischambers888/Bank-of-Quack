@@ -58,6 +58,31 @@ export interface SectorBudget {
   auto_rollup: boolean;
 }
 
+export interface YearlyCategoryBudget {
+  id: string;
+  category_id: string;
+  year: number;
+  created_at?: string;
+  updated_at?: string;
+  budget_type: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+}
+
+export interface YearlySectorBudget {
+  id: string;
+  sector_id: string;
+  year: number;
+  created_at?: string;
+  updated_at?: string;
+  budget_type: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+  auto_rollup: boolean;
+}
+
 // Budget periods are no longer stored in the database - spent amounts are calculated dynamically from transaction data
 
 export interface TransactionWithBudget extends Transaction {
@@ -103,6 +128,43 @@ export interface SectorBudgetSummary {
   user1_amount?: number;
   user2_amount?: number;
   auto_rollup: boolean;
+  current_period_budget?: number;
+  current_period_spent?: number;
+  current_period_user1_spent?: number;
+  current_period_user2_spent?: number;
+  current_period_remaining_percentage?: number;
+  current_period_remaining_amount?: number;
+  category_budgets_total: number;
+}
+
+export interface YearlyBudgetSummary {
+  category_id: string;
+  category_name: string;
+  category_image?: string;
+  budget_id?: string;
+  budget_type?: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+  year: number;
+  current_period_budget?: number;
+  current_period_spent?: number;
+  current_period_user1_spent?: number;
+  current_period_user2_spent?: number;
+  current_period_remaining_percentage?: number;
+  current_period_remaining_amount?: number;
+}
+
+export interface YearlySectorBudgetSummary {
+  sector_id: string;
+  sector_name: string;
+  budget_id?: string;
+  budget_type?: 'absolute' | 'split';
+  absolute_amount?: number;
+  user1_amount?: number;
+  user2_amount?: number;
+  auto_rollup: boolean;
+  year: number;
   current_period_budget?: number;
   current_period_spent?: number;
   current_period_user1_spent?: number;

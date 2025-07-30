@@ -13,6 +13,7 @@ import DashboardPage from "./pages/DashboardPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import SettingsPage from "./pages/SettingsPage";
 import { BudgetsPage } from "./pages/BudgetsPage";
+
 import LoginPage from "./pages/LoginPage";
 
 // 3. Define the router configuration

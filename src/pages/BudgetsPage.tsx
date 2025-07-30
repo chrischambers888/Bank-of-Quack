@@ -1183,6 +1183,11 @@ export function BudgetsPage() {
           incomeImageUrl={incomeImageUrl}
           settlementImageUrl={settlementImageUrl}
           reimbursementImageUrl={reimbursementImageUrl}
+          // Yearly budget props (placeholder for now)
+          yearlyBudgetSummaries={[]}
+          yearlySectorBudgetSummaries={[]}
+          selectedYear={selectedMonth.year}
+          selectedMonthForProgress={selectedMonth.month}
         />
       )}
 
