@@ -499,6 +499,16 @@ export function TabbedBudgetDisplay({
     });
   };
 
+  const getExcludedSectors = () => {
+    return sectors.filter((sector) => {
+      const sectorBudget = sectorBudgetSummaries.find(
+        (sb) => sb.sector_id === sector.id
+      );
+      // Exclude sectors that don't have budgets
+      return !sectorBudget?.budget_id;
+    });
+  };
+
   const getBudgetStats = () => {
     // Calculate sector budgets total (only for sectors with budgets)
     const sectorBudgetsTotal = sectorBudgetSummaries.reduce(
@@ -655,7 +665,42 @@ export function TabbedBudgetDisplay({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total Spent
+                  {(() => {
+                    const excludedSectors = getExcludedSectors();
+                    if (excludedSectors.length > 0) {
+                      const sectorNames = excludedSectors.map((s) => s.name);
+                      let excludedText;
+
+                      if (sectorNames.length === 1) {
+                        excludedText = `(excluding ${sectorNames[0]})`;
+                      } else if (sectorNames.length === 2) {
+                        excludedText = `(excluding ${sectorNames[0]} and ${sectorNames[1]})`;
+                      } else {
+                        excludedText = `(excluding ${sectorNames[0]}, ${sectorNames[1]} etc.)`;
+                      }
+
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help">
+                                Total Spent {excludedText}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">
+                                Excluded sectors: {sectorNames.join(", ")}
+                                <br />
+                                This number only counts expenses against
+                                budgeted items, minus any excluded transactions
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    }
+                    return "Total Spent";
+                  })()}
                 </CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
