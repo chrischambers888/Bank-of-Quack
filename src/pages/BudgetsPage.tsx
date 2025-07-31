@@ -226,6 +226,26 @@ export function BudgetsPage() {
     }
   };
 
+  // Create a modal-specific delete function that doesn't trigger full data refresh
+  const handleModalDeleteTransaction = async (id: string) => {
+    try {
+      // Delete from database
+      const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        console.error("Error deleting transaction:", error);
+        return;
+      }
+
+      // Update local state immediately without triggering loadData
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+    } catch (error) {
+      console.error("Error in handleModalDeleteTransaction:", error);
+    }
+  };
+
   // Handle toggling transaction exclusion from monthly budgets
   const handleToggleExclude = async (
     transactionId: string,
@@ -1175,7 +1195,7 @@ export function BudgetsPage() {
           onCreateBudget={handleCreateBudget}
           onCreateSectorBudget={handleCreateSectorBudget}
           userNames={userNames}
-          deleteTransaction={handleDeleteTransaction}
+          deleteTransaction={handleModalDeleteTransaction}
           handleSetEditingTransaction={handleSetEditingTransaction}
           onToggleExclude={handleToggleExclude}
           onTabChange={setActiveTab}
