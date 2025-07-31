@@ -35,10 +35,10 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BudgetForm } from "@/components/settings/BudgetForm";
-import { SectorBudgetForm } from "@/components/settings/SectorBudgetForm";
-import { BudgetCard } from "@/components/settings/BudgetCard";
-import { SectorBudgetCard } from "@/components/settings/SectorBudgetCard";
+import { BudgetForm } from "./BudgetForm";
+import { SectorBudgetForm } from "./SectorBudgetForm";
+import { BudgetCard } from "./BudgetCard";
+import { SectorBudgetCard } from "./SectorBudgetCard";
 import { EmptyStateCard } from "@/components/settings/EmptyStateCard";
 import TransactionList from "@/components/TransactionList";
 import {
@@ -895,7 +895,17 @@ export function TabbedBudgetDisplay({
                             isExpanded,
                           };
                         })
-                        .sort((a, b) => b.sectorPercentage - a.sectorPercentage)
+                        .sort((a, b) => {
+                          // First sort by whether sector has a defined budget
+                          const aHasBudget = !!a.sectorBudget?.budget_id;
+                          const bHasBudget = !!b.sectorBudget?.budget_id;
+
+                          if (aHasBudget && !bHasBudget) return -1; // a has budget, b doesn't
+                          if (!aHasBudget && bHasBudget) return 1; // b has budget, a doesn't
+
+                          // If both have the same budget status, sort by percentage used
+                          return b.sectorPercentage - a.sectorPercentage;
+                        })
                         .map(
                           ({
                             sector,
@@ -1609,7 +1619,17 @@ export function TabbedBudgetDisplay({
                         isExpanded,
                       };
                     })
-                    .sort((a, b) => b.sectorPercentage - a.sectorPercentage)
+                    .sort((a, b) => {
+                      // First sort by whether sector has a defined budget
+                      const aHasBudget = !!a.sectorBudget?.budget_id;
+                      const bHasBudget = !!b.sectorBudget?.budget_id;
+
+                      if (aHasBudget && !bHasBudget) return -1; // a has budget, b doesn't
+                      if (!aHasBudget && bHasBudget) return 1; // b has budget, a doesn't
+
+                      // If both have the same budget status, sort by percentage used
+                      return b.sectorPercentage - a.sectorPercentage;
+                    })
                     .map(
                       ({
                         sector,

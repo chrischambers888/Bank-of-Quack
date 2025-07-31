@@ -34,9 +34,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BudgetForm } from "@/components/settings/BudgetForm";
-import { SectorBudgetForm } from "@/components/settings/SectorBudgetForm";
-import { TabbedBudgetDisplay } from "@/components/settings/TabbedBudgetDisplay";
+import { BudgetForm } from "@/components/budgets/BudgetForm";
+import { SectorBudgetForm } from "@/components/budgets/SectorBudgetForm";
+import { TabbedBudgetDisplay } from "@/components/budgets/TabbedBudgetDisplay";
 import {
   Category,
   BudgetSummary,
