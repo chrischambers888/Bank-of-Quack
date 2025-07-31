@@ -36,6 +36,8 @@ import {
   getExcludedYearlySectors,
 } from "./budgetUtils";
 import { BudgetStats } from "./BudgetStats";
+import { Badge } from "@/components/ui/badge";
+import { SectorBudgetCard } from "./SectorBudgetCard";
 
 interface YearlyBudgetDisplayProps {
   sectors: Sector[];
@@ -721,36 +723,453 @@ export function YearlyBudgetDisplay({
         </Card>
       </div>
 
-      {/* Orphaned Yearly Category Budgets Section */}
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {/* Sector Budget Cards */}
+        {sectors
+          .sort((a, b) => {
+            const aBudget = yearlySectorBudgetSummaries.find(
+              (s) => s.sector_id === a.id
+            );
+            const bBudget = yearlySectorBudgetSummaries.find(
+              (s) => s.sector_id === b.id
+            );
+
+            const aHasBudget = aBudget && aBudget.budget_id;
+            const bHasBudget = bBudget && bBudget.budget_id;
+
+            // Sort defined budgets first, then undefined ones
+            if (aHasBudget && !bHasBudget) return -1;
+            if (!aHasBudget && bHasBudget) return 1;
+            return 0;
+          })
+          .map((sector) => {
+            const sectorBudget = yearlySectorBudgetSummaries.find(
+              (s) => s.sector_id === sector.id
+            );
+
+            // Check if sector has no yearly budget defined (no budget_id) or has a zero yearly budget
+            const hasNoBudget = !sectorBudget || !sectorBudget.budget_id;
+            const hasZeroBudget =
+              sectorBudget &&
+              sectorBudget.budget_id &&
+              ((sectorBudget.budget_type === "absolute" &&
+                (sectorBudget.absolute_amount || 0) === 0) ||
+                (sectorBudget.budget_type === "split" &&
+                  (sectorBudget.user1_amount || 0) +
+                    (sectorBudget.user2_amount || 0) ===
+                    0));
+
+            if (hasNoBudget || hasZeroBudget) {
+              // Show create budget card for sectors without yearly budgets or with zero yearly budgets
+              return (
+                <Card key={sector.id} className="border-dashed border-2">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center space-x-2">
+                      <Building2 className="h-5 w-5" />
+                      <span>{sector.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-4">
+                      <Button
+                        onClick={() => onCreateYearlySectorBudget(sector)}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Yearly Sector Budget
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            return (
+              <Card key={sector.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-semibold text-foreground">
+                      {sector.name}
+                    </CardTitle>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          toggleSectorExpansion(sector.id);
+                        }}
+                        className="h-8 w-8"
+                      >
+                        {expandedSectors.has(sector.id) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEditYearlySectorBudget(sectorBudget)}
+                        className="h-8 w-8"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDeleteYearlySectorBudget(sector.id)}
+                        className="h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary">
+                      {sectorBudget.budget_type === "absolute"
+                        ? "Absolute"
+                        : "Split"}
+                    </Badge>
+                    {sectorBudget.auto_rollup ? (
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-500/20 text-green-600"
+                      >
+                        Auto Rollup
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="bg-blue-500/20 text-blue-600"
+                      >
+                        Manual
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {selectedYear} (through{" "}
+                        {getMonthName(selectedMonthForProgress)}):
+                      </span>
+                      <span className="font-medium">
+                        {formatCurrency(sectorBudget.current_period_spent || 0)}{" "}
+                        /{" "}
+                        {formatCurrency(
+                          sectorBudget.current_period_budget || 0
+                        )}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div
+                        className={`h-2.5 rounded-full transition-all duration-300 ${
+                          (sectorBudget.current_period_spent || 0) >
+                          (sectorBudget.current_period_budget || 0)
+                            ? "bg-red-500"
+                            : (sectorBudget.current_period_spent || 0) >=
+                              (sectorBudget.current_period_budget || 0) * 0.8
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            ((sectorBudget.current_period_spent || 0) /
+                              (sectorBudget.current_period_budget || 1)) *
+                              100,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {(
+                          ((sectorBudget.current_period_spent || 0) /
+                            (sectorBudget.current_period_budget || 1)) *
+                          100
+                        ).toFixed(1)}
+                        % used
+                      </span>
+                      <span
+                        className={
+                          (sectorBudget.current_period_budget || 0) -
+                            (sectorBudget.current_period_spent || 0) >=
+                          0
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }
+                      >
+                        {formatCurrency(
+                          Math.abs(
+                            (sectorBudget.current_period_budget || 0) -
+                              (sectorBudget.current_period_spent || 0)
+                          )
+                        )}{" "}
+                        {(sectorBudget.current_period_budget || 0) -
+                          (sectorBudget.current_period_spent || 0) >=
+                        0
+                          ? "under"
+                          : "over"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Budget Details */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Budget</p>
+                      <p className="font-medium">
+                        {formatCurrency(
+                          sectorBudget.current_period_budget || 0
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Spent</p>
+                      <p className="text-muted-foreground">
+                        {formatCurrency(sectorBudget.current_period_spent || 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* User Spending Breakdown for Split Budgets */}
+                  {sectorBudget.budget_type === "split" && (
+                    <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                      <div className="flex justify-between items-center">
+                        <span>
+                          {userNames[0]}:{" "}
+                          {formatCurrency(
+                            sectorBudget.current_period_user1_spent || 0
+                          )}
+                          {` / ${formatCurrency(
+                            sectorBudget.user1_amount || 0
+                          )}`}
+                        </span>
+                        <span>
+                          {userNames[1]}:{" "}
+                          {formatCurrency(
+                            sectorBudget.current_period_user2_spent || 0
+                          )}
+                          {` / ${formatCurrency(
+                            sectorBudget.user2_amount || 0
+                          )}`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Expandable Category Budgets */}
+                  {expandedSectors.has(sector.id) && (
+                    <div className="space-y-3 pt-4 border-t border-muted">
+                      {yearlyBudgetSummaries
+                        .filter((budget) => {
+                          // Check if this category belongs to the current sector
+                          return (
+                            sector.category_ids &&
+                            sector.category_ids.includes(budget.category_id)
+                          );
+                        })
+                        .map((budget) => {
+                          const category = categories.find(
+                            (c) => c.id === budget.category_id
+                          );
+                          const totalBudget =
+                            budget.budget_type === "absolute"
+                              ? budget.absolute_amount || 0
+                              : (budget.user1_amount || 0) +
+                                (budget.user2_amount || 0);
+                          const spent = budget.current_period_spent || 0;
+                          const remaining = totalBudget - spent;
+                          const percentageUsed =
+                            totalBudget > 0 ? (spent / totalBudget) * 100 : 0;
+
+                          return (
+                            <div
+                              key={budget.category_id}
+                              className="ml-4 border-l-4 border-primary/30 bg-card/50 rounded-lg p-4 shadow-sm"
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center space-x-3">
+                                  {category?.image_url ? (
+                                    <img
+                                      src={category.image_url}
+                                      alt={category.name}
+                                      className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                                      <DollarSign className="h-3 w-3 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <h4 className="font-medium text-sm">
+                                      {category?.name}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">
+                                      {budget.budget_type === "absolute"
+                                        ? "Absolute"
+                                        : "Split"}{" "}
+                                      Budget
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => onEditYearlyBudget(budget)}
+                                    className="h-6 w-6"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      onDeleteYearlyBudget(budget.category_id)
+                                    }
+                                    className="h-6 w-6"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Progress Bar */}
+                              <div className="space-y-2 mb-3">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">
+                                    {selectedYear} (through{" "}
+                                    {getMonthName(selectedMonthForProgress)}):
+                                  </span>
+                                  <span className="font-medium">
+                                    {formatCurrency(spent)} /{" "}
+                                    {formatCurrency(totalBudget)}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full transition-all duration-300 ${
+                                      percentageUsed > 100
+                                        ? "bg-red-500"
+                                        : percentageUsed >= 80
+                                        ? "bg-yellow-500"
+                                        : "bg-green-500"
+                                    }`}
+                                    style={{
+                                      width: `${Math.min(
+                                        percentageUsed,
+                                        100
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">
+                                    {percentageUsed.toFixed(1)}% used
+                                  </span>
+                                  <span
+                                    className={
+                                      remaining >= 0
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }
+                                  >
+                                    {formatCurrency(Math.abs(remaining))}{" "}
+                                    {remaining >= 0 ? "under" : "over"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Budget Details */}
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground">
+                                    Budget
+                                  </p>
+                                  <p className="font-medium">
+                                    {formatCurrency(totalBudget)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Spent</p>
+                                  <p className="text-muted-foreground">
+                                    {formatCurrency(spent)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* User Spending for Split Budgets */}
+                              {budget.budget_type === "split" && (
+                                <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                                  <div className="flex justify-between items-center">
+                                    <span>
+                                      {userNames[0]}:{" "}
+                                      {formatCurrency(
+                                        budget.current_period_user1_spent || 0
+                                      )}
+                                      {` / ${formatCurrency(
+                                        budget.user1_amount || 0
+                                      )}`}
+                                    </span>
+                                    <span>
+                                      {userNames[1]}:{" "}
+                                      {formatCurrency(
+                                        budget.current_period_user2_spent || 0
+                                      )}
+                                      {` / ${formatCurrency(
+                                        budget.user2_amount || 0
+                                      )}`}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+      </div>
+
+      {/* Categories without sector budgets */}
       {(() => {
         const orphanedBudgets = getOrphanedYearlyBudgetSummaries(
           sectors,
           yearlyBudgetSummaries,
           yearlySectorBudgetSummaries
         );
-        if (orphanedBudgets.length === 0) return null;
+
+        if (orphanedBudgets.length === 0) {
+          return null;
+        }
 
         return (
           <div className="mt-8">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  <span>Orphaned Yearly Category Budgets</span>
+                <CardTitle className="text-lg font-semibold text-foreground">
+                  Categories without Sector Budgets
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  These yearly category budgets exist but their sectors don't
-                  have yearly budgets. Consider creating yearly sector budgets
-                  to better manage these categories.
+                  These categories have budgets but their sectors don't have
+                  yearly budgets set up.
                 </p>
               </CardHeader>
               <CardContent>
                 {/* Desktop Table View */}
                 <div className="hidden lg:block">
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="rounded-md border">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b bg-muted/50">
+                        <tr className="border-b bg-muted/20">
                           <th className="text-left py-3 px-4 font-semibold">
                             Category
                           </th>

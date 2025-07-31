@@ -9,6 +9,8 @@ import {
   TrendingUp,
   AlertTriangle,
   DollarSign,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { SectorBudgetSummary, SelectedMonth, BudgetSummary } from "@/types";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
@@ -23,6 +25,14 @@ interface SectorBudgetCardProps {
   user2AvatarUrl?: string | null;
   budgetSummaries?: BudgetSummary[];
   sectors?: any[];
+  isExpanded?: boolean;
+  onToggleExpansion?: () => void;
+  categories?: any[];
+  onEditBudget?: (budget: BudgetSummary) => void;
+  onDeleteBudget?: (categoryId: string) => void;
+  userNames?: { user1: string; user2: string };
+  getMonthName?: (month: SelectedMonth) => string;
+  formatCurrency?: (amount: number | null | undefined) => string;
 }
 
 export function SectorBudgetCard({
@@ -34,6 +44,14 @@ export function SectorBudgetCard({
   user2AvatarUrl,
   budgetSummaries = [],
   sectors = [],
+  isExpanded = false,
+  onToggleExpansion,
+  categories = [],
+  onEditBudget,
+  onDeleteBudget,
+  userNames: propUserNames,
+  getMonthName: propGetMonthName,
+  formatCurrency: propFormatCurrency,
 }: SectorBudgetCardProps) {
   const [userNames, setUserNames] = useState({
     user1: "User 1",
@@ -64,6 +82,24 @@ export function SectorBudgetCard({
 
     loadUserNames();
   }, []);
+
+  // Use prop values if provided, otherwise use local state
+  const finalUserNames = propUserNames || userNames;
+
+  // Define local functions first
+  const formatCurrency = (amount: number | null | undefined) => {
+    return amount != null ? `$${amount.toFixed(2)}` : "$0.00";
+  };
+
+  const getMonthName = () => {
+    if (!selectedMonth) return "Current Month";
+    const date = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  };
+
+  const finalGetMonthName = propGetMonthName || getMonthName;
+  const finalFormatCurrency = propFormatCurrency || formatCurrency;
+
   const {
     sector_id,
     sector_name,
@@ -139,16 +175,6 @@ export function SectorBudgetCard({
     return category_budgets_total > getBudgetAmount();
   };
 
-  const formatCurrency = (amount: number | null | undefined) => {
-    return amount != null ? `$${amount.toFixed(2)}` : "$0.00";
-  };
-
-  const getMonthName = () => {
-    if (!selectedMonth) return "Current Month";
-    const date = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
-    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  };
-
   // Calculate category budgets total client-side
   const calculateCategoryBudgetsTotal = () => {
     if (!budgetSummaries || budgetSummaries.length === 0) {
@@ -184,6 +210,20 @@ export function SectorBudgetCard({
             {sector_name}
           </CardTitle>
           <div className="flex items-center space-x-2">
+            {onToggleExpansion && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleExpansion}
+                className="h-8 w-8"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -244,10 +284,12 @@ export function SectorBudgetCard({
           current_period_budget !== null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{getMonthName()}:</span>
+                <span className="text-muted-foreground">
+                  {finalGetMonthName(selectedMonth)}:
+                </span>
                 <span className="font-medium">
-                  {formatCurrency(current_period_spent)} /{" "}
-                  {formatCurrency(current_period_budget)}
+                  {finalFormatCurrency(current_period_spent)} /{" "}
+                  {finalFormatCurrency(current_period_budget)}
                 </span>
               </div>
               <CustomProgress
@@ -287,7 +329,7 @@ export function SectorBudgetCard({
                         ? current_period_budget - (current_period_spent || 0)
                         : 0;
                     const isOver = remaining < 0;
-                    return `${formatCurrency(Math.abs(remaining))} ${
+                    return `${finalFormatCurrency(Math.abs(remaining))} ${
                       isOver ? "over" : "under"
                     }`;
                   })()}
@@ -299,16 +341,16 @@ export function SectorBudgetCard({
                 <div className="text-xs text-muted-foreground space-y-1 pt-2">
                   <div className="flex justify-between items-center">
                     <span>
-                      {userNames.user1}:{" "}
-                      {formatCurrency(current_period_user1_spent)}
+                      {finalUserNames.user1}:{" "}
+                      {finalFormatCurrency(current_period_user1_spent)}
                       {budget_type === "split" &&
-                        ` / ${formatCurrency(user1_amount)}`}
+                        ` / ${finalFormatCurrency(user1_amount)}`}
                     </span>
                     <span>
-                      {userNames.user2}:{" "}
-                      {formatCurrency(current_period_user2_spent)}
+                      {finalUserNames.user2}:{" "}
+                      {finalFormatCurrency(current_period_user2_spent)}
                       {budget_type === "split" &&
-                        ` / ${formatCurrency(user2_amount)}`}
+                        ` / ${finalFormatCurrency(user2_amount)}`}
                     </span>
                   </div>
                   <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
@@ -390,12 +432,12 @@ export function SectorBudgetCard({
                         {user1AvatarUrl ? (
                           <img
                             src={user1AvatarUrl}
-                            alt={`${userNames.user1} avatar`}
+                            alt={`${finalUserNames.user1} avatar`}
                             className="w-full h-full object-cover"
                           />
                         ) : (
                           <span className="text-xs text-white font-bold">
-                            {userNames.user1.charAt(0).toUpperCase()}
+                            {finalUserNames.user1.charAt(0).toUpperCase()}
                           </span>
                         )}
                       </div>
@@ -428,12 +470,12 @@ export function SectorBudgetCard({
                         {user2AvatarUrl ? (
                           <img
                             src={user2AvatarUrl}
-                            alt={`${userNames.user2} avatar`}
+                            alt={`${finalUserNames.user2} avatar`}
                             className="w-full h-full object-cover"
                           />
                         ) : (
                           <span className="text-xs text-white font-bold">
-                            {userNames.user2.charAt(0).toUpperCase()}
+                            {finalUserNames.user2.charAt(0).toUpperCase()}
                           </span>
                         )}
                       </div>
@@ -465,6 +507,171 @@ export function SectorBudgetCard({
             <div className="text-sm text-muted-foreground">
               No budget set for this sector
             </div>
+          </div>
+        )}
+
+        {/* Expandable Category Budgets */}
+        {isExpanded && onEditBudget && onDeleteBudget && categories && (
+          <div className="space-y-3 pt-4 border-t border-muted">
+            {budgetSummaries
+              .filter((budget) => {
+                // Find the current sector
+                const currentSector = sectors.find((s) => s.id === sector_id);
+                if (!currentSector) return false;
+
+                // Check if this category belongs to the current sector
+                return (
+                  currentSector.category_ids &&
+                  currentSector.category_ids.includes(budget.category_id)
+                );
+              })
+              .map((budget) => {
+                const category = categories.find(
+                  (c) => c.id === budget.category_id
+                );
+                const totalBudget =
+                  budget.budget_type === "absolute"
+                    ? budget.absolute_amount || 0
+                    : (budget.user1_amount || 0) + (budget.user2_amount || 0);
+                const spent = budget.current_period_spent || 0;
+                const remaining = totalBudget - spent;
+                const percentageUsed =
+                  totalBudget > 0 ? (spent / totalBudget) * 100 : 0;
+
+                return (
+                  <div
+                    key={budget.category_id}
+                    className="ml-4 border-l-4 border-primary/30 bg-card/50 rounded-lg p-4 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        {category?.image_url ? (
+                          <img
+                            src={category.image_url}
+                            alt={category.name}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                            <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="font-medium text-sm">
+                            {category?.name}
+                          </h4>
+                          <p className="text-xs text-muted-foreground">
+                            {budget.budget_type === "absolute"
+                              ? "Absolute"
+                              : "Split"}{" "}
+                            Budget
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEditBudget(budget)}
+                          className="h-6 w-6"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDeleteBudget(budget.category_id)}
+                          className="h-6 w-6"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-2 mb-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {finalGetMonthName(selectedMonth)}:
+                        </span>
+                        <span className="font-medium">
+                          {finalFormatCurrency(spent)} /{" "}
+                          {finalFormatCurrency(totalBudget)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            percentageUsed > 100
+                              ? "bg-red-500"
+                              : percentageUsed >= 80
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                          }`}
+                          style={{
+                            width: `${Math.min(percentageUsed, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {percentageUsed.toFixed(1)}% used
+                        </span>
+                        <span
+                          className={
+                            remaining >= 0 ? "text-green-600" : "text-red-600"
+                          }
+                        >
+                          {finalFormatCurrency(Math.abs(remaining))}{" "}
+                          {remaining >= 0 ? "under" : "over"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Budget Details */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Budget</p>
+                        <p className="font-medium">
+                          {finalFormatCurrency(totalBudget)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Spent</p>
+                        <p className="text-muted-foreground">
+                          {finalFormatCurrency(spent)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* User Spending for Split Budgets */}
+                    {budget.budget_type === "split" && (
+                      <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                        <div className="flex justify-between items-center">
+                          <span>
+                            {finalUserNames.user1}:{" "}
+                            {finalFormatCurrency(
+                              budget.current_period_user1_spent || 0
+                            )}
+                            {` / ${finalFormatCurrency(
+                              budget.user1_amount || 0
+                            )}`}
+                          </span>
+                          <span>
+                            {finalUserNames.user2}:{" "}
+                            {finalFormatCurrency(
+                              budget.current_period_user2_spent || 0
+                            )}
+                            {` / ${finalFormatCurrency(
+                              budget.user2_amount || 0
+                            )}`}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </CardContent>

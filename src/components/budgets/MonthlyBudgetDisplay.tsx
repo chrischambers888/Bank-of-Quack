@@ -48,6 +48,7 @@ import {
   getBudgetStats,
   getExcludedSectors,
 } from "./budgetUtils";
+import { SectorBudgetCard } from "./SectorBudgetCard";
 
 interface MonthlyBudgetDisplayProps {
   sectors: Sector[];
@@ -402,19 +403,208 @@ export function MonthlyBudgetDisplay({
 
       {/* Mobile Card View */}
       <div className="lg:hidden space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              Budget Overview - {getMonthName(selectedMonth)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Mobile cards content will be implemented in a separate component */}
-            <div className="text-center py-8 text-muted-foreground">
-              Mobile cards view - to be implemented
-            </div>
-          </CardContent>
-        </Card>
+        {/* Sector Budget Cards */}
+        {sectors
+          .sort((a, b) => {
+            const aBudget = sectorBudgetSummaries.find(
+              (s) => s.sector_id === a.id
+            );
+            const bBudget = sectorBudgetSummaries.find(
+              (s) => s.sector_id === b.id
+            );
+
+            const aHasBudget = aBudget && aBudget.budget_id;
+            const bHasBudget = bBudget && bBudget.budget_id;
+
+            // Sort defined budgets first, then undefined ones
+            if (aHasBudget && !bHasBudget) return -1;
+            if (!aHasBudget && bHasBudget) return 1;
+            return 0;
+          })
+          .map((sector) => {
+            const sectorBudget = sectorBudgetSummaries.find(
+              (s) => s.sector_id === sector.id
+            );
+
+            // Check if sector has no budget defined (no budget_id) or has a zero budget
+            const hasNoBudget = !sectorBudget || !sectorBudget.budget_id;
+            const hasZeroBudget =
+              sectorBudget &&
+              sectorBudget.budget_id &&
+              ((sectorBudget.budget_type === "absolute" &&
+                (sectorBudget.absolute_amount || 0) === 0) ||
+                (sectorBudget.budget_type === "split" &&
+                  (sectorBudget.user1_amount || 0) +
+                    (sectorBudget.user2_amount || 0) ===
+                    0));
+
+            if (hasNoBudget || hasZeroBudget) {
+              // Show create budget card for sectors without budgets or with zero budgets
+              return (
+                <Card key={sector.id} className="border-dashed border-2">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center space-x-2">
+                      <Building2 className="h-5 w-5" />
+                      <span>{sector.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-4">
+                      <Button
+                        onClick={() => onCreateSectorBudget(sector)}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Sector Budget
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            // Get category budgets for this sector
+            const sectorBudgets = budgetSummaries.filter((budget) =>
+              sector.category_ids.includes(budget.category_id)
+            );
+
+            return (
+              <div key={sector.id}>
+                <SectorBudgetCard
+                  sectorBudgetSummary={sectorBudget}
+                  onEdit={onEditSectorBudget}
+                  onDelete={onDeleteSectorBudget}
+                  selectedMonth={selectedMonth}
+                  user1AvatarUrl={user1AvatarUrl}
+                  user2AvatarUrl={user2AvatarUrl}
+                  budgetSummaries={budgetSummaries}
+                  sectors={sectors}
+                  isExpanded={expandedSectors.has(sector.id)}
+                  onToggleExpansion={() => {
+                    toggleSectorExpansion(sector.id);
+                  }}
+                  categories={categories}
+                  onEditBudget={onEditBudget}
+                  onDeleteBudget={onDeleteBudget}
+                  userNames={{ user1: userNames[0], user2: userNames[1] }}
+                  getMonthName={getMonthName}
+                  formatCurrency={(amount: number | null | undefined) =>
+                    formatCurrency(amount || 0)
+                  }
+                />
+              </div>
+            );
+          })}
+
+        {/* Categories without sector budgets */}
+        {(() => {
+          const orphanedBudgets = getOrphanedBudgetSummaries(
+            sectors,
+            budgetSummaries,
+            sectorBudgetSummaries
+          );
+
+          if (orphanedBudgets.length === 0) return null;
+
+          return (
+            <Card className="border-yellow-200 bg-yellow-50/50">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                  <span>Orphaned Category Budgets</span>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  These category budgets exist but their sectors don't have
+                  budgets.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {orphanedBudgets.map((budget) => {
+                  const category = categories.find(
+                    (c) => c.id === budget.category_id
+                  );
+                  const sector = sectors.find((s) =>
+                    s.category_ids.includes(budget.category_id)
+                  );
+                  const totalBudget =
+                    budget.budget_type === "absolute"
+                      ? budget.absolute_amount || 0
+                      : (budget.user1_amount || 0) + (budget.user2_amount || 0);
+                  const spent = budget.current_period_spent || 0;
+                  const remaining = totalBudget - spent;
+
+                  return (
+                    <div
+                      key={budget.category_id}
+                      className="border rounded-lg p-4 bg-white"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          {category?.image_url ? (
+                            <img
+                              src={category.image_url}
+                              alt={category.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                              <DollarSign className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium">{category?.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Sector: {sector?.name || "Unknown"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                        <div>
+                          <p className="text-muted-foreground">Budget</p>
+                          <p className="font-medium">
+                            {formatCurrency(totalBudget)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Spent</p>
+                          <p className="text-muted-foreground">
+                            {formatCurrency(spent)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Remaining</p>
+                          <p
+                            className={
+                              remaining >= 0
+                                ? "text-green-600 font-medium"
+                                : "text-red-600 font-medium"
+                            }
+                          >
+                            {formatCurrency(remaining)}
+                          </p>
+                        </div>
+                      </div>
+                      {sector && (
+                        <div className="flex justify-center">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onCreateSectorBudget(sector)}
+                            className="w-full"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Create Sector Budget
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          );
+        })()}
       </div>
 
       {/* Orphaned Category Budgets Section */}
