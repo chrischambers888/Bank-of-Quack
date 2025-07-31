@@ -41,6 +41,12 @@ interface TabbedBudgetDisplayProps {
   incomeImageUrl?: string | null;
   settlementImageUrl?: string | null;
   reimbursementImageUrl?: string | null;
+  // UI state props
+  activeTab?: string;
+  expandedSectors?: Set<string>;
+  expandedYearlySectors?: Set<string>;
+  onExpandedSectorsChange?: (expandedSectors: Set<string>) => void;
+  onExpandedYearlySectorsChange?: (expandedSectors: Set<string>) => void;
   // Yearly budget props
   yearlyBudgetSummaries?: YearlyBudgetSummary[];
   yearlySectorBudgetSummaries?: YearlySectorBudgetSummary[];
@@ -82,6 +88,12 @@ export function TabbedBudgetDisplay({
   incomeImageUrl,
   settlementImageUrl,
   reimbursementImageUrl,
+  // UI state props
+  activeTab: externalActiveTab,
+  expandedSectors: externalExpandedSectors,
+  expandedYearlySectors: externalExpandedYearlySectors,
+  onExpandedSectorsChange,
+  onExpandedYearlySectorsChange,
   // Yearly budget props
   yearlyBudgetSummaries = [],
   yearlySectorBudgetSummaries = [],
@@ -95,7 +107,43 @@ export function TabbedBudgetDisplay({
   onCreateYearlyBudget,
   onCreateYearlySectorBudget,
 }: TabbedBudgetDisplayProps) {
-  const [activeTab, setActiveTab] = useState("monthly");
+  // Use external state if provided, otherwise use internal state
+  const [internalActiveTab, setInternalActiveTab] = useState("monthly");
+  const [internalExpandedSectors, setInternalExpandedSectors] = useState<
+    Set<string>
+  >(new Set());
+  const [internalExpandedYearlySectors, setInternalExpandedYearlySectors] =
+    useState<Set<string>>(new Set());
+
+  const activeTab = externalActiveTab ?? internalActiveTab;
+  const expandedSectors = externalExpandedSectors ?? internalExpandedSectors;
+  const expandedYearlySectors =
+    externalExpandedYearlySectors ?? internalExpandedYearlySectors;
+
+  const setActiveTab = (value: string) => {
+    if (externalActiveTab !== undefined) {
+      onTabChange?.(value);
+    } else {
+      setInternalActiveTab(value);
+      onTabChange?.(value);
+    }
+  };
+
+  const setExpandedSectors = (value: Set<string>) => {
+    if (externalExpandedSectors !== undefined) {
+      onExpandedSectorsChange?.(value);
+    } else {
+      setInternalExpandedSectors(value);
+    }
+  };
+
+  const setExpandedYearlySectors = (value: Set<string>) => {
+    if (externalExpandedYearlySectors !== undefined) {
+      onExpandedYearlySectorsChange?.(value);
+    } else {
+      setInternalExpandedYearlySectors(value);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -143,6 +191,9 @@ export function TabbedBudgetDisplay({
             incomeImageUrl={incomeImageUrl}
             settlementImageUrl={settlementImageUrl}
             reimbursementImageUrl={reimbursementImageUrl}
+            // UI state props
+            expandedSectors={expandedSectors}
+            onExpandedSectorsChange={setExpandedSectors}
           />
         </TabsContent>
 
@@ -172,6 +223,9 @@ export function TabbedBudgetDisplay({
             incomeImageUrl={incomeImageUrl}
             settlementImageUrl={settlementImageUrl}
             reimbursementImageUrl={reimbursementImageUrl}
+            // UI state props
+            expandedSectors={expandedYearlySectors}
+            onExpandedSectorsChange={setExpandedYearlySectors}
           />
         </TabsContent>
       </Tabs>

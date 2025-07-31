@@ -380,6 +380,17 @@ export function BudgetsPage() {
     useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("monthly");
 
+  // State for preserving UI state across re-renders
+  const [expandedSectors, setExpandedSectors] = useState<Set<string>>(
+    new Set()
+  );
+  const [expandedYearlySectors, setExpandedYearlySectors] = useState<
+    Set<string>
+  >(new Set());
+
+  // Loading state for form operations
+  const [isFormSaving, setIsFormSaving] = useState(false);
+
   const [tempMainSelection, setTempMainSelection] = useState<SelectedMonth>({
     year: 0,
     month: 0,
@@ -747,6 +758,323 @@ export function BudgetsPage() {
     }
   };
 
+  // Optimized function to reload only budget data without full data reload
+  const loadBudgetData = async () => {
+    try {
+      // Wait for transactions to be loaded from useAppData
+      if (transactions.length === 0) {
+        return; // Exit early if transactions aren't loaded yet
+      }
+
+      // Check if the selected month has budget data
+      const monthHasData = await checkMonthHasData(
+        selectedMonth.year,
+        selectedMonth.month
+      );
+      setHasBudgetData(monthHasData);
+
+      if (monthHasData) {
+        // Load category budgets for the selected month
+        const { data: categoryBudgetsData, error: categoryBudgetsError } =
+          await supabase
+            .from("category_budgets")
+            .select("*")
+            .eq("year", selectedMonth.year)
+            .eq("month", selectedMonth.month);
+
+        if (categoryBudgetsError) throw categoryBudgetsError;
+
+        // Load sector budgets for the selected month
+        const { data: sectorBudgetsData, error: sectorBudgetsError } =
+          await supabase
+            .from("sector_budgets")
+            .select("*")
+            .eq("year", selectedMonth.year)
+            .eq("month", selectedMonth.month);
+
+        if (sectorBudgetsError) {
+          console.warn("Error loading sector budgets:", sectorBudgetsError);
+        }
+
+        // Calculate budget summaries client-side
+        const budgetSummaries = categories
+          .map((category) => {
+            const budget = categoryBudgetsData?.find(
+              (b) => b.category_id === category.id
+            );
+            if (!budget) return null;
+
+            const spent = calculateCategorySpent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user1Spent = calculateCategoryUser1Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user2Spent = calculateCategoryUser2Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const budgetAmount = calculateBudgetAmount(budget);
+            const remainingPercentage =
+              calculateRemainingPercentage(budgetAmount, spent) || 0;
+            const remainingAmount =
+              calculateRemainingAmount(budgetAmount, spent) || 0;
+
+            return {
+              category_id: category.id,
+              category_name: category.name,
+              category_image: category.image_url,
+              budget_id: budget.id,
+              budget_type: budget.budget_type,
+              absolute_amount: budget.absolute_amount,
+              user1_amount: budget.user1_amount,
+              user2_amount: budget.user2_amount,
+              current_year: selectedMonth.year,
+              current_month: selectedMonth.month,
+              current_period_budget: budgetAmount,
+              current_period_spent: spent,
+              current_period_user1_spent: user1Spent,
+              current_period_user2_spent: user2Spent,
+              current_period_remaining_percentage: remainingPercentage,
+              current_period_remaining_amount: remainingAmount,
+            };
+          })
+          .filter(Boolean);
+
+        setBudgetSummaries(budgetSummaries as BudgetSummary[]);
+
+        // Calculate sector budget summaries client-side
+        const sectorBudgetSummaries = sectors.map((sector: Sector) => {
+          const budget = sectorBudgetsData?.find(
+            (b) => b.sector_id === sector.id
+          );
+
+          const spent = calculateSectorSpent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user1Spent = calculateSectorUser1Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user2Spent = calculateSectorUser2Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const budgetAmount = budget ? calculateBudgetAmount(budget) : 0;
+          const remainingPercentage = calculateRemainingPercentage(
+            budgetAmount,
+            spent
+          );
+          const remainingAmount = calculateRemainingAmount(budgetAmount, spent);
+
+          // Count category budgets in this sector
+          const categoryBudgetsTotal = budgetSummaries.filter(
+            (bs) => bs && sector.category_ids.includes(bs.category_id)
+          ).length;
+
+          return {
+            sector_id: sector.id,
+            sector_name: sector.name,
+            budget_id: budget?.id,
+            budget_type: budget?.budget_type,
+            absolute_amount: budget?.absolute_amount,
+            user1_amount: budget?.user1_amount,
+            user2_amount: budget?.user2_amount,
+            auto_rollup: budget?.auto_rollup || false,
+            current_period_budget: budgetAmount,
+            current_period_spent: spent,
+            current_period_user1_spent: user1Spent,
+            current_period_user2_spent: user2Spent,
+            current_period_remaining_percentage: remainingPercentage,
+            current_period_remaining_amount: remainingAmount,
+            category_budgets_total: categoryBudgetsTotal,
+          };
+        });
+
+        setSectorBudgetSummaries(
+          sectorBudgetSummaries as SectorBudgetSummary[]
+        );
+      } else {
+        setBudgetSummaries([]);
+        setSectorBudgetSummaries([]);
+      }
+
+      // Load yearly budgets for the selected year
+      const {
+        data: yearlyCategoryBudgetsData,
+        error: yearlyCategoryBudgetsError,
+      } = await supabase
+        .from("yearly_category_budgets")
+        .select("*")
+        .eq("year", selectedMonth.year);
+
+      if (yearlyCategoryBudgetsError) {
+        console.warn(
+          "Error loading yearly category budgets:",
+          yearlyCategoryBudgetsError
+        );
+      }
+
+      // Load yearly sector budgets for the selected year
+      const { data: yearlySectorBudgetsData, error: yearlySectorBudgetsError } =
+        await supabase
+          .from("yearly_sector_budgets")
+          .select("*")
+          .eq("year", selectedMonth.year);
+
+      if (yearlySectorBudgetsError) {
+        console.warn(
+          "Error loading yearly sector budgets:",
+          yearlySectorBudgetsError
+        );
+      }
+
+      // Check if the selected year has yearly budget data
+      const hasYearlyData = Boolean(
+        (yearlyCategoryBudgetsData && yearlyCategoryBudgetsData.length > 0) ||
+          (yearlySectorBudgetsData && yearlySectorBudgetsData.length > 0)
+      );
+      setHasYearlyBudgetData(hasYearlyData);
+
+      if (hasYearlyData) {
+        // Calculate yearly budget summaries client-side
+        const yearlyBudgetSummaries = categories
+          .map((category) => {
+            const budget = yearlyCategoryBudgetsData?.find(
+              (b) => b.category_id === category.id
+            );
+            if (!budget) return null;
+
+            const spent = calculateYearlyCategorySpent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user1Spent = calculateYearlyCategoryUser1Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user2Spent = calculateYearlyCategoryUser2Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const budgetAmount = calculateBudgetAmount(budget);
+            const remainingPercentage =
+              calculateRemainingPercentage(budgetAmount, spent) || 0;
+            const remainingAmount =
+              calculateRemainingAmount(budgetAmount, spent) || 0;
+
+            return {
+              category_id: category.id,
+              category_name: category.name,
+              category_image: category.image_url,
+              budget_id: budget.id,
+              budget_type: budget.budget_type,
+              absolute_amount: budget.absolute_amount,
+              user1_amount: budget.user1_amount,
+              user2_amount: budget.user2_amount,
+              year: selectedMonth.year,
+              current_period_budget: budgetAmount,
+              current_period_spent: spent,
+              current_period_user1_spent: user1Spent,
+              current_period_user2_spent: user2Spent,
+              current_period_remaining_percentage: remainingPercentage,
+              current_period_remaining_amount: remainingAmount,
+            };
+          })
+          .filter(Boolean);
+
+        setYearlyBudgetSummaries(
+          yearlyBudgetSummaries as YearlyBudgetSummary[]
+        );
+
+        // Calculate yearly sector budget summaries client-side
+        const yearlySectorBudgetSummaries = sectors.map((sector: Sector) => {
+          const budget = yearlySectorBudgetsData?.find(
+            (b) => b.sector_id === sector.id
+          );
+
+          const spent = calculateYearlySectorSpent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user1Spent = calculateYearlySectorUser1Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user2Spent = calculateYearlySectorUser2Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const budgetAmount = budget ? calculateBudgetAmount(budget) : 0;
+          const remainingPercentage =
+            calculateRemainingPercentage(budgetAmount, spent) || 0;
+          const remainingAmount =
+            calculateRemainingAmount(budgetAmount, spent) || 0;
+
+          // Count category budgets in this sector
+          const categoryBudgetsTotal = yearlyBudgetSummaries.filter(
+            (bs) => bs && sector.category_ids.includes(bs.category_id)
+          ).length;
+
+          return {
+            sector_id: sector.id,
+            sector_name: sector.name,
+            budget_id: budget?.id,
+            budget_type: budget?.budget_type,
+            absolute_amount: budget?.absolute_amount,
+            user1_amount: budget?.user1_amount,
+            user2_amount: budget?.user2_amount,
+            auto_rollup: budget?.auto_rollup || false,
+            year: selectedMonth.year,
+            current_period_budget: budgetAmount,
+            current_period_spent: spent,
+            current_period_user1_spent: user1Spent,
+            current_period_user2_spent: user2Spent,
+            current_period_remaining_percentage: remainingPercentage,
+            current_period_remaining_amount: remainingAmount,
+            category_budgets_total: categoryBudgetsTotal,
+          };
+        });
+
+        setYearlySectorBudgetSummaries(
+          yearlySectorBudgetSummaries as YearlySectorBudgetSummary[]
+        );
+      } else {
+        setYearlyBudgetSummaries([]);
+        setYearlySectorBudgetSummaries([]);
+      }
+    } catch (error) {
+      console.error("Error loading budget data:", error);
+    }
+  };
+
   const handleCreateBudget = (category: Category) => {
     setSelectedCategory(category);
     setEditingBudget(null);
@@ -763,12 +1091,31 @@ export function BudgetsPage() {
   };
 
   const handleSaveBudget = async () => {
-    // Add a small delay to ensure database triggers have time to execute
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await loadData();
-    setIsFormOpen(false);
-    setSelectedCategory(null);
-    setEditingBudget(null);
+    setIsFormSaving(true);
+
+    try {
+      // Add a small delay to ensure database triggers have time to execute
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Preserve current UI state
+      const currentActiveTab = activeTab;
+      const currentExpandedSectors = new Set(expandedSectors);
+      const currentExpandedYearlySectors = new Set(expandedYearlySectors);
+
+      // Only reload budget data, not all data
+      await loadBudgetData();
+
+      // Restore UI state after data reload
+      setActiveTab(currentActiveTab);
+      setExpandedSectors(currentExpandedSectors);
+      setExpandedYearlySectors(currentExpandedYearlySectors);
+
+      setIsFormOpen(false);
+      setSelectedCategory(null);
+      setEditingBudget(null);
+    } finally {
+      setIsFormSaving(false);
+    }
   };
 
   const handleCreateSectorBudget = (sector: Sector) => {
@@ -838,12 +1185,31 @@ export function BudgetsPage() {
   };
 
   const handleSaveSectorBudget = async () => {
-    // Add a small delay to ensure database triggers have time to execute
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await loadData();
-    setIsSectorFormOpen(false);
-    setSelectedSector(null);
-    setEditingSectorBudget(null);
+    setIsFormSaving(true);
+
+    try {
+      // Add a small delay to ensure database triggers have time to execute
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Preserve current UI state
+      const currentActiveTab = activeTab;
+      const currentExpandedSectors = new Set(expandedSectors);
+      const currentExpandedYearlySectors = new Set(expandedYearlySectors);
+
+      // Only reload budget data, not all data
+      await loadBudgetData();
+
+      // Restore UI state after data reload
+      setActiveTab(currentActiveTab);
+      setExpandedSectors(currentExpandedSectors);
+      setExpandedYearlySectors(currentExpandedYearlySectors);
+
+      setIsSectorFormOpen(false);
+      setSelectedSector(null);
+      setEditingSectorBudget(null);
+    } finally {
+      setIsFormSaving(false);
+    }
   };
 
   // Yearly budget handlers
@@ -871,12 +1237,31 @@ export function BudgetsPage() {
   };
 
   const handleSaveYearlyBudget = async () => {
-    // Add a small delay to ensure database triggers have time to execute
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await loadData();
-    setIsYearlyFormOpen(false);
-    setSelectedCategory(null);
-    setEditingYearlyBudget(null);
+    setIsFormSaving(true);
+
+    try {
+      // Add a small delay to ensure database triggers have time to execute
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Preserve current UI state
+      const currentActiveTab = activeTab;
+      const currentExpandedSectors = new Set(expandedSectors);
+      const currentExpandedYearlySectors = new Set(expandedYearlySectors);
+
+      // Only reload budget data, not all data
+      await loadBudgetData();
+
+      // Restore UI state after data reload
+      setActiveTab(currentActiveTab);
+      setExpandedSectors(currentExpandedSectors);
+      setExpandedYearlySectors(currentExpandedYearlySectors);
+
+      setIsYearlyFormOpen(false);
+      setSelectedCategory(null);
+      setEditingYearlyBudget(null);
+    } finally {
+      setIsFormSaving(false);
+    }
   };
 
   const handleCreateYearlySectorBudget = (sector: Sector) => {
@@ -908,12 +1293,31 @@ export function BudgetsPage() {
   };
 
   const handleSaveYearlySectorBudget = async () => {
-    // Add a small delay to ensure database triggers have time to execute
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await loadData();
-    setIsYearlySectorFormOpen(false);
-    setSelectedSector(null);
-    setEditingYearlySectorBudget(null);
+    setIsFormSaving(true);
+
+    try {
+      // Add a small delay to ensure database triggers have time to execute
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Preserve current UI state
+      const currentActiveTab = activeTab;
+      const currentExpandedSectors = new Set(expandedSectors);
+      const currentExpandedYearlySectors = new Set(expandedYearlySectors);
+
+      // Only reload budget data, not all data
+      await loadBudgetData();
+
+      // Restore UI state after data reload
+      setActiveTab(currentActiveTab);
+      setExpandedSectors(currentExpandedSectors);
+      setExpandedYearlySectors(currentExpandedYearlySectors);
+
+      setIsYearlySectorFormOpen(false);
+      setSelectedSector(null);
+      setEditingYearlySectorBudget(null);
+    } finally {
+      setIsFormSaving(false);
+    }
   };
 
   const handleDeleteYearlyBudget = async (categoryId: string) => {
@@ -1541,6 +1945,12 @@ export function BudgetsPage() {
           incomeImageUrl={incomeImageUrl}
           settlementImageUrl={settlementImageUrl}
           reimbursementImageUrl={reimbursementImageUrl}
+          // UI state props
+          activeTab={activeTab}
+          expandedSectors={expandedSectors}
+          expandedYearlySectors={expandedYearlySectors}
+          onExpandedSectorsChange={setExpandedSectors}
+          onExpandedYearlySectorsChange={setExpandedYearlySectors}
           // Yearly budget props
           yearlyBudgetSummaries={yearlyBudgetSummaries}
           yearlySectorBudgetSummaries={yearlySectorBudgetSummaries}
@@ -1716,6 +2126,14 @@ export function BudgetsPage() {
           onOpenChange={setIsFormOpen}
         >
           <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            {isFormSaving && (
+              <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  <span className="text-white font-medium">Saving...</span>
+                </div>
+              </div>
+            )}
             <BudgetForm
               category={selectedCategory}
               existingBudget={editingBudget || undefined}
@@ -1759,6 +2177,14 @@ export function BudgetsPage() {
           onOpenChange={setIsSectorFormOpen}
         >
           <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            {isFormSaving && (
+              <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  <span className="text-white font-medium">Saving...</span>
+                </div>
+              </div>
+            )}
             <SectorBudgetForm
               key={editingSectorBudget?.id || "new"}
               sector={selectedSector}
@@ -1818,6 +2244,14 @@ export function BudgetsPage() {
           onOpenChange={setIsYearlyFormOpen}
         >
           <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            {isFormSaving && (
+              <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  <span className="text-white font-medium">Saving...</span>
+                </div>
+              </div>
+            )}
             <BudgetForm
               category={selectedCategory}
               existingBudget={editingYearlyBudget || undefined}
@@ -1862,6 +2296,14 @@ export function BudgetsPage() {
           onOpenChange={setIsYearlySectorFormOpen}
         >
           <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            {isFormSaving && (
+              <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  <span className="text-white font-medium">Saving...</span>
+                </div>
+              </div>
+            )}
             <SectorBudgetForm
               key={editingYearlySectorBudget?.id || "new"}
               sector={selectedSector}

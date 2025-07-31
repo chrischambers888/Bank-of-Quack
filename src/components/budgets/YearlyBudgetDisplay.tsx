@@ -66,6 +66,9 @@ interface YearlyBudgetDisplayProps {
   incomeImageUrl?: string | null;
   settlementImageUrl?: string | null;
   reimbursementImageUrl?: string | null;
+  // UI state props
+  expandedSectors?: Set<string>;
+  onExpandedSectorsChange?: (expandedSectors: Set<string>) => void;
 }
 
 export function YearlyBudgetDisplay({
@@ -92,11 +95,26 @@ export function YearlyBudgetDisplay({
   incomeImageUrl,
   settlementImageUrl,
   reimbursementImageUrl,
+  // UI state props
+  expandedSectors: externalExpandedSectors,
+  onExpandedSectorsChange,
 }: YearlyBudgetDisplayProps) {
   const { yellowThreshold } = useBudgetSettings();
-  const [expandedSectors, setExpandedSectors] = useState<Set<string>>(
-    new Set()
-  );
+
+  // Use external state if provided, otherwise use internal state
+  const [internalExpandedSectors, setInternalExpandedSectors] = useState<
+    Set<string>
+  >(new Set());
+
+  const expandedSectors = externalExpandedSectors ?? internalExpandedSectors;
+
+  const setExpandedSectors = (value: Set<string>) => {
+    if (externalExpandedSectors !== undefined) {
+      onExpandedSectorsChange?.(value);
+    } else {
+      setInternalExpandedSectors(value);
+    }
+  };
   const [modalData, setModalData] = useState<any>(null);
   const [tooltip, setTooltip] = useState<{
     show: boolean;

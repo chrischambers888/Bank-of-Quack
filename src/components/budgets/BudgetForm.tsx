@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Switch } from "@/components/ui/switch";
+import { Loader2 } from "lucide-react";
 import {
   Category,
   BudgetFormData,
@@ -470,11 +471,16 @@ export function BudgetForm({
               disabled={isLoading || !validateForm()}
               className="flex-1"
             >
-              {isLoading
-                ? "Saving..."
-                : existingBudget
-                ? "Update Budget"
-                : "Create Budget"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : existingBudget ? (
+                "Update Budget"
+              ) : (
+                "Create Budget"
+              )}
             </Button>
           </div>
         </form>

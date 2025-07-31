@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 import {
   Sector,
   SectorBudget,
@@ -500,11 +501,16 @@ export function SectorBudgetForm({
           }
           className="flex-1"
         >
-          {isSubmitting
-            ? "Saving..."
-            : existingBudget
-            ? "Update Budget"
-            : "Create Budget"}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : existingBudget ? (
+            "Update Budget"
+          ) : (
+            "Create Budget"
+          )}
         </Button>
       </div>
     </form>
