@@ -1347,7 +1347,8 @@ export function BudgetsPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Budgets</h1>
           <p className="text-muted-foreground text-sm sm:text-base hidden sm:block">
-            Manage your monthly spending budgets by sector and category
+            Manage your monthly and yearly spending budgets by sector and
+            category
           </p>
         </div>
 

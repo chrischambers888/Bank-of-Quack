@@ -4,6 +4,8 @@ import {
   Sector,
   SectorBudgetSummary,
   SelectedMonth,
+  YearlyBudgetSummary,
+  YearlySectorBudgetSummary,
 } from "@/types";
 
 export const formatCurrency = (amount: number) => {
@@ -57,6 +59,107 @@ export const getOrphanedBudgetSummaries = (sectors: Sector[], budgetSummaries: B
 
     // Return true if category has budget but sector doesn't
     return budget.budget_id && !sectorHasBudget;
+  });
+};
+
+export const getOrphanedYearlyBudgetSummaries = (sectors: Sector[], yearlyBudgetSummaries: YearlyBudgetSummary[], yearlySectorBudgetSummaries: YearlySectorBudgetSummary[]) => {
+  return yearlyBudgetSummaries.filter((budget) => {
+    // Find which sector this category belongs to
+    const sector = sectors.find((s) => s.category_ids.includes(budget.category_id));
+    if (!sector) return false; // Category not assigned to any sector
+
+    // Check if the sector has a yearly budget
+    const sectorBudget = yearlySectorBudgetSummaries.find((sb) => sb.sector_id === sector.id);
+    const sectorHasBudget = sectorBudget?.budget_id;
+
+    // Return true if category has budget but sector doesn't
+    return budget.budget_id && !sectorHasBudget;
+  });
+};
+
+export const getYearlyBudgetStats = (
+  sectors: Sector[],
+  yearlyBudgetSummaries: YearlyBudgetSummary[],
+  yearlySectorBudgetSummaries: YearlySectorBudgetSummary[]
+) => {
+  // Calculate sector budgets total (only for sectors with budgets)
+  const sectorBudgetsTotal = yearlySectorBudgetSummaries.reduce((sum, sectorBudget) => {
+    if (!sectorBudget.budget_id) {
+      return sum; // Skip sectors without budgets
+    }
+    const budget =
+      sectorBudget.budget_type === "absolute"
+        ? sectorBudget.absolute_amount || 0
+        : (sectorBudget.user1_amount || 0) + (sectorBudget.user2_amount || 0);
+    return sum + budget;
+  }, 0);
+
+  // Calculate category budgets total (excluding those covered by sector budgets)
+  const activeCategoryBudgets = yearlyBudgetSummaries.filter((b) => b.budget_id);
+  const categoryBudgetsTotal = activeCategoryBudgets.reduce((sum, budget) => {
+    // Check if this category belongs to a sector with a budget
+    const sectorWithBudget = sectors?.find((sector) => {
+      if (!sector.category_ids?.includes(budget.category_id)) {
+        return false; // Category doesn't belong to this sector
+      }
+      const sectorBudget = yearlySectorBudgetSummaries.find((sb) => sb.sector_id === sector.id);
+      return sectorBudget?.budget_id; // Only exclude if sector has a budget
+    });
+
+    if (sectorWithBudget) {
+      return sum; // Skip this category budget as it's covered by sector budget
+    }
+
+    const budgetAmount =
+      budget.budget_type === "absolute"
+        ? budget.absolute_amount || 0
+        : (budget.user1_amount || 0) + (budget.user2_amount || 0);
+    return sum + budgetAmount;
+  }, 0);
+
+  // Total budget is sector budgets + category budgets (for categories without sector budgets)
+  const totalBudget = sectorBudgetsTotal + categoryBudgetsTotal;
+
+  // Calculate total spent (from both sector and category budgets, with sector priority)
+  const sectorSpent = yearlySectorBudgetSummaries.reduce((sum, b) => {
+    if (b.budget_id) {
+      return sum + (b.current_period_spent || 0);
+    }
+    return sum;
+  }, 0);
+  const categorySpent = activeCategoryBudgets.reduce((sum, budget) => {
+    // Check if this category belongs to a sector with a budget
+    const sectorWithBudget = sectors?.find((sector) => {
+      if (!sector.category_ids?.includes(budget.category_id)) {
+        return false; // Category doesn't belong to this sector
+      }
+      const sectorBudget = yearlySectorBudgetSummaries.find((sb) => sb.sector_id === sector.id);
+      return sectorBudget?.budget_id; // Only exclude if sector has a budget
+    });
+
+    if (sectorWithBudget) {
+      return sum; // Skip this category spending as it's covered by sector spending
+    }
+    return sum + (budget.current_period_spent || 0);
+  }, 0);
+  const totalSpent = sectorSpent + categorySpent;
+
+  const totalRemaining = totalBudget - totalSpent;
+  const overallPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+  return {
+    totalBudget,
+    totalSpent,
+    totalRemaining,
+    overallPercentage,
+  };
+};
+
+export const getExcludedYearlySectors = (sectors: Sector[], yearlySectorBudgetSummaries: YearlySectorBudgetSummary[]) => {
+  return sectors.filter((sector) => {
+    const sectorBudget = yearlySectorBudgetSummaries.find((sb) => sb.sector_id === sector.id);
+    // Exclude sectors that don't have yearly budgets
+    return !sectorBudget?.budget_id;
   });
 };
 

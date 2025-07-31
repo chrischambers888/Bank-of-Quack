@@ -90,7 +90,9 @@ export function BudgetTable({
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-3 px-4 font-semibold">Category</th>
+                <th className="text-left py-3 px-4 font-semibold">
+                  Sector/Category
+                </th>
                 <th className="text-right py-3 px-4 font-semibold">Budget</th>
                 <th className="text-right py-3 px-4 font-semibold">Spent</th>
                 <th className="text-right py-3 px-4 font-semibold">
@@ -325,25 +327,23 @@ export function BudgetTable({
                               <>
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   onClick={() =>
                                     onEditSectorBudget(sectorBudget)
                                   }
-                                  className="h-6 px-2 text-xs"
+                                  className="h-8 px-3"
                                 >
-                                  <Edit className="h-3 w-3 mr-1" />
-                                  Edit
+                                  <Edit className="h-3 w-3" />
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   onClick={() =>
                                     onDeleteSectorBudget(sector.id, sector.name)
                                   }
-                                  className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                  className="h-8 px-3 text-red-600 hover:text-red-700"
                                 >
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Delete
+                                  <Trash2 className="h-3 w-3" />
                                 </Button>
                               </>
                             ) : (
@@ -351,7 +351,7 @@ export function BudgetTable({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => onCreateSectorBudget(sector)}
-                                className="h-6 px-2 text-xs"
+                                className="h-8 px-3"
                               >
                                 <Plus className="h-3 w-3 mr-1" />
                                 Create
@@ -485,7 +485,7 @@ export function BudgetTable({
                                         <div className="flex justify-center space-x-1">
                                           <Button
                                             size="sm"
-                                            variant="ghost"
+                                            variant="outline"
                                             onClick={() =>
                                               onEditBudget({
                                                 id: budgetSummary.budget_id!,
@@ -503,21 +503,21 @@ export function BudgetTable({
                                                   budgetSummary.user2_amount,
                                               })
                                             }
-                                            className="h-6 px-2 text-xs"
+                                            className="h-8 px-3"
                                           >
-                                            Edit
+                                            <Edit className="h-3 w-3" />
                                           </Button>
                                           <Button
                                             size="sm"
-                                            variant="ghost"
+                                            variant="outline"
                                             onClick={() =>
                                               onDeleteBudget(
                                                 budgetSummary.category_id
                                               )
                                             }
-                                            className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                            className="h-8 px-3 text-red-600 hover:text-red-700"
                                           >
-                                            Delete
+                                            <Trash2 className="h-3 w-3" />
                                           </Button>
                                         </div>
                                       </td>
@@ -759,21 +759,21 @@ export function BudgetTable({
                               <div className="flex justify-center space-x-1">
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   onClick={() => onEditBudget(budgetSummary)}
-                                  className="h-6 px-2 text-xs"
+                                  className="h-8 px-3"
                                 >
-                                  Edit
+                                  <Edit className="h-3 w-3" />
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   onClick={() =>
                                     onDeleteBudget(budgetSummary.category_id)
                                   }
-                                  className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                  className="h-8 px-3 text-red-600 hover:text-red-700"
                                 >
-                                  Delete
+                                  <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
                             </td>
