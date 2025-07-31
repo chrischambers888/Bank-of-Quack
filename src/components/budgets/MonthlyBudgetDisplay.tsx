@@ -282,88 +282,19 @@ export function MonthlyBudgetDisplay({
       id
     );
 
-    // Call the parent's modal-specific delete function
-    await deleteTransaction(id);
+    try {
+      // Call the parent's modal-specific delete function
+      await deleteTransaction(id);
 
-    // Refresh modal transactions if modal is open
-    if (modalData) {
-      if (modalData.type === "sector") {
-        const sector = modalData.data.sector;
-        // Filter transactions for this sector and month
-        const sectorTransactions = allTransactions.filter(
-          (t) =>
-            sector.category_ids.includes(t.category_id) &&
-            new Date(t.date) >=
-              new Date(
-                `${selectedMonth.year}-${selectedMonth.month
-                  .toString()
-                  .padStart(2, "0")}-01`
-              ) &&
-            new Date(t.date) <
-              new Date(
-                `${selectedMonth.year}-${(selectedMonth.month + 1)
-                  .toString()
-                  .padStart(2, "0")}-01`
-              )
-        );
-
-        // Find reimbursements that reimburse these transactions
-        const relevantExpenseIds = sectorTransactions.map((t) => t.id);
-        const relevantReimbursements = allTransactions.filter(
-          (t) =>
-            t.transaction_type === "reimbursement" &&
-            t.reimburses_transaction_id &&
-            relevantExpenseIds.includes(t.reimburses_transaction_id)
-        );
-
-        const finalTransactions = [
-          ...sectorTransactions,
-          ...relevantReimbursements,
-        ];
-
+      // Simply remove the transaction from the modal's transaction list
+      if (modalData) {
         setModalData({
           ...modalData,
-          transactions: finalTransactions,
-        });
-      } else {
-        const budgetSummary = modalData.data.budgetSummary;
-        // Filter transactions for this category and month
-        const categoryTransactions = allTransactions.filter(
-          (t) =>
-            t.category_id === budgetSummary.category_id &&
-            new Date(t.date) >=
-              new Date(
-                `${selectedMonth.year}-${selectedMonth.month
-                  .toString()
-                  .padStart(2, "0")}-01`
-              ) &&
-            new Date(t.date) <
-              new Date(
-                `${selectedMonth.year}-${(selectedMonth.month + 1)
-                  .toString()
-                  .padStart(2, "0")}-01`
-              )
-        );
-
-        // Find reimbursements that reimburse these transactions
-        const relevantExpenseIds = categoryTransactions.map((t) => t.id);
-        const relevantReimbursements = allTransactions.filter(
-          (t) =>
-            t.transaction_type === "reimbursement" &&
-            t.reimburses_transaction_id &&
-            relevantExpenseIds.includes(t.reimburses_transaction_id)
-        );
-
-        const finalTransactions = [
-          ...categoryTransactions,
-          ...relevantReimbursements,
-        ];
-
-        setModalData({
-          ...modalData,
-          transactions: finalTransactions,
+          transactions: modalData.transactions.filter((t) => t.id !== id),
         });
       }
+    } catch (error) {
+      console.error("Error in handleDeleteTransaction:", error);
     }
   };
 
