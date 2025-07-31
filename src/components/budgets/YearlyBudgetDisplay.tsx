@@ -1168,49 +1168,24 @@ export function YearlyBudgetDisplay({
                             <div className="text-xs text-muted-foreground font-medium">
                               Categories without yearly budgets:
                             </div>
-                            {categoriesWithoutBudgets.map((category) => (
-                              <div
-                                key={category.id}
-                                className="border-l-2 border-dashed border-muted/40 bg-muted/5 rounded-md p-3"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-2">
-                                    {category.image_url ? (
-                                      <img
-                                        src={category.image_url}
-                                        alt={category.name}
-                                        className="w-5 h-5 rounded-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-5 h-5 bg-muted rounded-full flex items-center justify-center">
-                                        <DollarSign className="h-2.5 w-2.5 text-muted-foreground" />
-                                      </div>
-                                    )}
-                                    <div>
-                                      <h4 className="font-medium text-sm text-muted-foreground">
-                                        {category.name}
-                                      </h4>
-                                      <p className="text-xs text-muted-foreground">
-                                        No yearly budget set
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      onEditYearlyBudget({
-                                        category_id: category.id,
-                                      } as any)
-                                    }
-                                    className="h-6 px-2 text-xs"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Create
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
+                            <div className="flex flex-wrap gap-2">
+                              {categoriesWithoutBudgets.map((category) => (
+                                <Button
+                                  key={category.id}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    onEditYearlyBudget({
+                                      category_id: category.id,
+                                    } as any)
+                                  }
+                                  className="h-7 px-3 text-xs"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  {category.name}
+                                </Button>
+                              ))}
+                            </div>
                           </div>
                         );
                       })()}
