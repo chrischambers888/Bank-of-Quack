@@ -727,27 +727,35 @@ export function YearlyBudgetDisplay({
       <div className="lg:hidden space-y-4">
         {/* Sector Budget Cards */}
         {sectors
-          .sort((a, b) => {
-            const aBudget = yearlySectorBudgetSummaries.find(
-              (s) => s.sector_id === a.id
-            );
-            const bBudget = yearlySectorBudgetSummaries.find(
-              (s) => s.sector_id === b.id
-            );
-
-            const aHasBudget = aBudget && aBudget.budget_id;
-            const bHasBudget = bBudget && bBudget.budget_id;
-
-            // Sort defined budgets first, then undefined ones
-            if (aHasBudget && !bHasBudget) return -1;
-            if (!aHasBudget && bHasBudget) return 1;
-            return 0;
-          })
           .map((sector) => {
             const sectorBudget = yearlySectorBudgetSummaries.find(
               (s) => s.sector_id === sector.id
             );
 
+            // Calculate sector percentage for sorting (same as desktop)
+            const sectorTotal = sectorBudget?.current_period_budget || 0;
+            const sectorSpent = sectorBudget?.current_period_spent || 0;
+            const sectorPercentage =
+              sectorTotal > 0 ? (sectorSpent / sectorTotal) * 100 : 0;
+
+            return {
+              sector,
+              sectorBudget,
+              sectorPercentage,
+            };
+          })
+          .sort((a, b) => {
+            // First sort by whether sector has a defined budget
+            const aHasBudget = !!a.sectorBudget?.budget_id;
+            const bHasBudget = !!b.sectorBudget?.budget_id;
+
+            if (aHasBudget && !bHasBudget) return -1; // a has budget, b doesn't
+            if (!aHasBudget && bHasBudget) return 1; // b has budget, a doesn't
+
+            // If both have the same budget status, sort by percentage used (descending)
+            return b.sectorPercentage - a.sectorPercentage;
+          })
+          .map(({ sector, sectorBudget }) => {
             // Check if sector has no yearly budget defined (no budget_id) or has a zero yearly budget
             const hasNoBudget = !sectorBudget || !sectorBudget.budget_id;
             const hasZeroBudget =
@@ -965,6 +973,7 @@ export function YearlyBudgetDisplay({
                   {/* Expandable Category Budgets */}
                   {expandedSectors.has(sector.id) && (
                     <div className="space-y-3 pt-4 border-t border-muted">
+                      {/* Categories with existing budgets */}
                       {yearlyBudgetSummaries
                         .filter((budget) => {
                           // Check if this category belongs to the current sector
@@ -1131,6 +1140,80 @@ export function YearlyBudgetDisplay({
                             </div>
                           );
                         })}
+
+                      {/* Categories without budgets */}
+                      {(() => {
+                        // Get all categories that belong to this sector
+                        const sectorCategories = categories.filter((cat) =>
+                          sector.category_ids.includes(cat.id)
+                        );
+
+                        // Get categories that have yearly budgets
+                        const categoriesWithBudgets = yearlyBudgetSummaries
+                          .filter((budget) =>
+                            sector.category_ids.includes(budget.category_id)
+                          )
+                          .map((budget) => budget.category_id);
+
+                        // Find categories without yearly budgets
+                        const categoriesWithoutBudgets =
+                          sectorCategories.filter(
+                            (cat) => !categoriesWithBudgets.includes(cat.id)
+                          );
+
+                        if (categoriesWithoutBudgets.length === 0) return null;
+
+                        return (
+                          <div className="space-y-2 pt-3 border-t border-muted/30">
+                            <div className="text-xs text-muted-foreground font-medium">
+                              Categories without yearly budgets:
+                            </div>
+                            {categoriesWithoutBudgets.map((category) => (
+                              <div
+                                key={category.id}
+                                className="border-l-2 border-dashed border-muted/40 bg-muted/5 rounded-md p-3"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    {category.image_url ? (
+                                      <img
+                                        src={category.image_url}
+                                        alt={category.name}
+                                        className="w-5 h-5 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-5 h-5 bg-muted rounded-full flex items-center justify-center">
+                                        <DollarSign className="h-2.5 w-2.5 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <h4 className="font-medium text-sm text-muted-foreground">
+                                        {category.name}
+                                      </h4>
+                                      <p className="text-xs text-muted-foreground">
+                                        No yearly budget set
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      onEditYearlyBudget({
+                                        category_id: category.id,
+                                      } as any)
+                                    }
+                                    className="h-6 px-2 text-xs"
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Create
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </CardContent>

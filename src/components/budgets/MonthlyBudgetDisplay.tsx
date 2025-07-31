@@ -405,27 +405,35 @@ export function MonthlyBudgetDisplay({
       <div className="lg:hidden space-y-4">
         {/* Sector Budget Cards */}
         {sectors
-          .sort((a, b) => {
-            const aBudget = sectorBudgetSummaries.find(
-              (s) => s.sector_id === a.id
-            );
-            const bBudget = sectorBudgetSummaries.find(
-              (s) => s.sector_id === b.id
-            );
-
-            const aHasBudget = aBudget && aBudget.budget_id;
-            const bHasBudget = bBudget && bBudget.budget_id;
-
-            // Sort defined budgets first, then undefined ones
-            if (aHasBudget && !bHasBudget) return -1;
-            if (!aHasBudget && bHasBudget) return 1;
-            return 0;
-          })
           .map((sector) => {
             const sectorBudget = sectorBudgetSummaries.find(
               (s) => s.sector_id === sector.id
             );
 
+            // Calculate sector percentage for sorting (same as desktop)
+            const sectorTotal = sectorBudget?.current_period_budget || 0;
+            const sectorSpent = sectorBudget?.current_period_spent || 0;
+            const sectorPercentage =
+              sectorTotal > 0 ? (sectorSpent / sectorTotal) * 100 : 0;
+
+            return {
+              sector,
+              sectorBudget,
+              sectorPercentage,
+            };
+          })
+          .sort((a, b) => {
+            // First sort by whether sector has a defined budget
+            const aHasBudget = !!a.sectorBudget?.budget_id;
+            const bHasBudget = !!b.sectorBudget?.budget_id;
+
+            if (aHasBudget && !bHasBudget) return -1; // a has budget, b doesn't
+            if (!aHasBudget && bHasBudget) return 1; // b has budget, a doesn't
+
+            // If both have the same budget status, sort by percentage used (descending)
+            return b.sectorPercentage - a.sectorPercentage;
+          })
+          .map(({ sector, sectorBudget }) => {
             // Check if sector has no budget defined (no budget_id) or has a zero budget
             const hasNoBudget = !sectorBudget || !sectorBudget.budget_id;
             const hasZeroBudget =

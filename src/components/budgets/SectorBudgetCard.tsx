@@ -11,6 +11,7 @@ import {
   DollarSign,
   ChevronDown,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { SectorBudgetSummary, SelectedMonth, BudgetSummary } from "@/types";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
@@ -513,6 +514,7 @@ export function SectorBudgetCard({
         {/* Expandable Category Budgets */}
         {isExpanded && onEditBudget && onDeleteBudget && categories && (
           <div className="space-y-3 pt-4 border-t border-muted">
+            {/* Categories with existing budgets */}
             {budgetSummaries
               .filter((budget) => {
                 // Find the current sector
@@ -672,6 +674,80 @@ export function SectorBudgetCard({
                   </div>
                 );
               })}
+
+            {/* Categories without budgets */}
+            {(() => {
+              const currentSector = sectors.find((s) => s.id === sector_id);
+              if (!currentSector) return null;
+
+              // Get all categories that belong to this sector
+              const sectorCategories = categories.filter((cat) =>
+                currentSector.category_ids.includes(cat.id)
+              );
+
+              // Get categories that have budgets
+              const categoriesWithBudgets = budgetSummaries
+                .filter((budget) =>
+                  currentSector.category_ids.includes(budget.category_id)
+                )
+                .map((budget) => budget.category_id);
+
+              // Find categories without budgets
+              const categoriesWithoutBudgets = sectorCategories.filter(
+                (cat) => !categoriesWithBudgets.includes(cat.id)
+              );
+
+              if (categoriesWithoutBudgets.length === 0) return null;
+
+              return (
+                <div className="space-y-2 pt-3 border-t border-muted/30">
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Categories without budgets:
+                  </div>
+                  {categoriesWithoutBudgets.map((category) => (
+                    <div
+                      key={category.id}
+                      className="border-l-2 border-dashed border-muted/40 bg-muted/5 rounded-md p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {category.image_url ? (
+                            <img
+                              src={category.image_url}
+                              alt={category.name}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 bg-muted rounded-full flex items-center justify-center">
+                              <DollarSign className="h-2.5 w-2.5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-medium text-sm text-muted-foreground">
+                              {category.name}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              No budget set
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            onEditBudget({ category_id: category.id } as any)
+                          }
+                          className="h-6 px-2 text-xs"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Create
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
       </CardContent>
