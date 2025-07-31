@@ -46,6 +46,10 @@ import {
   Sector,
   SectorBudget,
   SectorBudgetSummary,
+  YearlyBudgetSummary,
+  YearlySectorBudgetSummary,
+  YearlyCategoryBudget,
+  YearlySectorBudget,
 } from "@/types";
 import { supabase } from "@/supabaseClient";
 import {
@@ -85,6 +89,12 @@ import {
   calculateBudgetAmount,
   calculateRemainingPercentage,
   calculateRemainingAmount,
+  calculateYearlyCategorySpent,
+  calculateYearlyCategoryUser1Spent,
+  calculateYearlyCategoryUser2Spent,
+  calculateYearlySectorSpent,
+  calculateYearlySectorUser1Spent,
+  calculateYearlySectorUser2Spent,
 } from "@/utils/budgetCalculations";
 
 // Custom Month/Year Picker Component
@@ -316,6 +326,11 @@ export function BudgetsPage() {
   const [sectorBudgetSummaries, setSectorBudgetSummaries] = useState<
     SectorBudgetSummary[]
   >([]);
+  const [yearlyBudgetSummaries, setYearlyBudgetSummaries] = useState<
+    YearlyBudgetSummary[]
+  >([]);
+  const [yearlySectorBudgetSummaries, setYearlySectorBudgetSummaries] =
+    useState<YearlySectorBudgetSummary[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [localSectors, setLocalSectors] = useState<Sector[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -328,13 +343,25 @@ export function BudgetsPage() {
   );
   const [editingSectorBudget, setEditingSectorBudget] =
     useState<SectorBudget | null>(null);
+  const [editingYearlyBudget, setEditingYearlyBudget] =
+    useState<YearlyCategoryBudget | null>(null);
+  const [editingYearlySectorBudget, setEditingYearlySectorBudget] =
+    useState<YearlySectorBudget | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSectorFormOpen, setIsSectorFormOpen] = useState(false);
+  const [isYearlyFormOpen, setIsYearlyFormOpen] = useState(false);
+  const [isYearlySectorFormOpen, setIsYearlySectorFormOpen] = useState(false);
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
   const [deletingSectorBudgetId, setDeletingSectorBudgetId] = useState<
     string | null
   >(null);
+  const [deletingYearlyBudgetId, setDeletingYearlyBudgetId] = useState<
+    string | null
+  >(null);
+  const [deletingYearlySectorBudgetId, setDeletingYearlySectorBudgetId] =
+    useState<string | null>(null);
   const [hasBudgetData, setHasBudgetData] = useState(true);
+  const [hasYearlyBudgetData, setHasYearlyBudgetData] = useState(true);
   const [isCarryingForward, setIsCarryingForward] = useState(false);
   const [isCopyingFromMonth, setIsCopyingFromMonth] = useState(false);
   const [showCopyDialog, setShowCopyDialog] = useState(false);
@@ -465,14 +492,10 @@ export function BudgetsPage() {
               transactions
             );
             const budgetAmount = calculateBudgetAmount(budget);
-            const remainingPercentage = calculateRemainingPercentage(
-              budgetAmount,
-              spent
-            );
-            const remainingAmount = calculateRemainingAmount(
-              budgetAmount,
-              spent
-            );
+            const remainingPercentage =
+              calculateRemainingPercentage(budgetAmount, spent) || 0;
+            const remainingAmount =
+              calculateRemainingAmount(budgetAmount, spent) || 0;
 
             return {
               category_id: category.id,
@@ -560,6 +583,163 @@ export function BudgetsPage() {
         setBudgetSummaries([]);
         setSectorBudgetSummaries([]);
       }
+
+      // Load yearly budgets for the selected year
+      const {
+        data: yearlyCategoryBudgetsData,
+        error: yearlyCategoryBudgetsError,
+      } = await supabase
+        .from("yearly_category_budgets")
+        .select("*")
+        .eq("year", selectedMonth.year);
+
+      if (yearlyCategoryBudgetsError) {
+        console.warn(
+          "Error loading yearly category budgets:",
+          yearlyCategoryBudgetsError
+        );
+      }
+
+      // Load yearly sector budgets for the selected year
+      const { data: yearlySectorBudgetsData, error: yearlySectorBudgetsError } =
+        await supabase
+          .from("yearly_sector_budgets")
+          .select("*")
+          .eq("year", selectedMonth.year);
+
+      if (yearlySectorBudgetsError) {
+        console.warn(
+          "Error loading yearly sector budgets:",
+          yearlySectorBudgetsError
+        );
+      }
+
+      // Check if the selected year has yearly budget data
+      const hasYearlyData = Boolean(
+        (yearlyCategoryBudgetsData && yearlyCategoryBudgetsData.length > 0) ||
+          (yearlySectorBudgetsData && yearlySectorBudgetsData.length > 0)
+      );
+      setHasYearlyBudgetData(hasYearlyData);
+
+      if (hasYearlyData) {
+        // Calculate yearly budget summaries client-side
+        const yearlyBudgetSummaries = categories
+          .map((category) => {
+            const budget = yearlyCategoryBudgetsData?.find(
+              (b) => b.category_id === category.id
+            );
+            if (!budget) return null;
+
+            const spent = calculateYearlyCategorySpent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user1Spent = calculateYearlyCategoryUser1Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const user2Spent = calculateYearlyCategoryUser2Spent(
+              category.id,
+              selectedMonth.year,
+              selectedMonth.month,
+              transactions
+            );
+            const budgetAmount = calculateBudgetAmount(budget);
+            const remainingPercentage =
+              calculateRemainingPercentage(budgetAmount, spent) || 0;
+            const remainingAmount =
+              calculateRemainingAmount(budgetAmount, spent) || 0;
+
+            return {
+              category_id: category.id,
+              category_name: category.name,
+              category_image: category.image_url,
+              budget_id: budget.id,
+              budget_type: budget.budget_type,
+              absolute_amount: budget.absolute_amount,
+              user1_amount: budget.user1_amount,
+              user2_amount: budget.user2_amount,
+              year: selectedMonth.year,
+              current_period_budget: budgetAmount,
+              current_period_spent: spent,
+              current_period_user1_spent: user1Spent,
+              current_period_user2_spent: user2Spent,
+              current_period_remaining_percentage: remainingPercentage,
+              current_period_remaining_amount: remainingAmount,
+            };
+          })
+          .filter(Boolean);
+
+        setYearlyBudgetSummaries(
+          yearlyBudgetSummaries as YearlyBudgetSummary[]
+        );
+
+        // Calculate yearly sector budget summaries client-side
+        const yearlySectorBudgetSummaries = sectors.map((sector: Sector) => {
+          const budget = yearlySectorBudgetsData?.find(
+            (b) => b.sector_id === sector.id
+          );
+
+          const spent = calculateYearlySectorSpent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user1Spent = calculateYearlySectorUser1Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const user2Spent = calculateYearlySectorUser2Spent(
+            sector.category_ids,
+            selectedMonth.year,
+            selectedMonth.month,
+            transactions
+          );
+          const budgetAmount = budget ? calculateBudgetAmount(budget) : 0;
+          const remainingPercentage =
+            calculateRemainingPercentage(budgetAmount, spent) || 0;
+          const remainingAmount =
+            calculateRemainingAmount(budgetAmount, spent) || 0;
+
+          // Count category budgets in this sector
+          const categoryBudgetsTotal = yearlyBudgetSummaries.filter(
+            (bs) => bs && sector.category_ids.includes(bs.category_id)
+          ).length;
+
+          return {
+            sector_id: sector.id,
+            sector_name: sector.name,
+            budget_id: budget?.id,
+            budget_type: budget?.budget_type,
+            absolute_amount: budget?.absolute_amount,
+            user1_amount: budget?.user1_amount,
+            user2_amount: budget?.user2_amount,
+            auto_rollup: budget?.auto_rollup || false,
+            year: selectedMonth.year,
+            current_period_budget: budgetAmount,
+            current_period_spent: spent,
+            current_period_user1_spent: user1Spent,
+            current_period_user2_spent: user2Spent,
+            current_period_remaining_percentage: remainingPercentage,
+            current_period_remaining_amount: remainingAmount,
+            category_budgets_total: categoryBudgetsTotal,
+          };
+        });
+
+        setYearlySectorBudgetSummaries(
+          yearlySectorBudgetSummaries as YearlySectorBudgetSummary[]
+        );
+      } else {
+        setYearlyBudgetSummaries([]);
+        setYearlySectorBudgetSummaries([]);
+      }
     } catch (error) {
       console.error("Error loading budget data:", error);
     } finally {
@@ -616,6 +796,25 @@ export function BudgetsPage() {
       }, 0);
   };
 
+  const getYearlyCategoryBudgetsTotalForSector = (sectorId: string) => {
+    return yearlyBudgetSummaries
+      .filter((budgetSummary) => {
+        // Check if this category belongs to the sector
+        const sector = localSectors.find((s) => s.id === sectorId);
+        return (
+          sector && sector.category_ids.includes(budgetSummary.category_id)
+        );
+      })
+      .reduce((total, budgetSummary) => {
+        const budgetAmount =
+          budgetSummary.budget_type === "absolute"
+            ? budgetSummary.absolute_amount || 0
+            : (budgetSummary.user1_amount || 0) +
+              (budgetSummary.user2_amount || 0);
+        return total + budgetAmount;
+      }, 0);
+  };
+
   const handleEditSectorBudget = (sectorBudgetSummary: SectorBudgetSummary) => {
     const sector = localSectors.find(
       (s) => s.id === sectorBudgetSummary.sector_id
@@ -645,6 +844,144 @@ export function BudgetsPage() {
     setIsSectorFormOpen(false);
     setSelectedSector(null);
     setEditingSectorBudget(null);
+  };
+
+  // Yearly budget handlers
+  const handleCreateYearlyBudget = (category: Category) => {
+    setSelectedCategory(category);
+    setEditingYearlyBudget(null);
+    setIsYearlyFormOpen(true);
+  };
+
+  const handleEditYearlyBudget = (budget: YearlyBudgetSummary) => {
+    const category = categories.find((c) => c.id === budget.category_id);
+    if (category) {
+      setSelectedCategory(category);
+      setEditingYearlyBudget({
+        id: budget.budget_id!,
+        category_id: budget.category_id,
+        year: selectedMonth.year,
+        budget_type: budget.budget_type!,
+        absolute_amount: budget.absolute_amount ?? 0,
+        user1_amount: budget.user1_amount ?? 0,
+        user2_amount: budget.user2_amount ?? 0,
+      });
+      setIsYearlyFormOpen(true);
+    }
+  };
+
+  const handleSaveYearlyBudget = async () => {
+    // Add a small delay to ensure database triggers have time to execute
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await loadData();
+    setIsYearlyFormOpen(false);
+    setSelectedCategory(null);
+    setEditingYearlyBudget(null);
+  };
+
+  const handleCreateYearlySectorBudget = (sector: Sector) => {
+    setSelectedSector(sector);
+    setEditingYearlySectorBudget(null);
+    setIsYearlySectorFormOpen(true);
+  };
+
+  const handleEditYearlySectorBudget = (
+    sectorBudgetSummary: YearlySectorBudgetSummary
+  ) => {
+    const sector = localSectors.find(
+      (s) => s.id === sectorBudgetSummary.sector_id
+    );
+    if (sector) {
+      setSelectedSector(sector);
+      setEditingYearlySectorBudget({
+        id: sectorBudgetSummary.budget_id!,
+        sector_id: sectorBudgetSummary.sector_id,
+        year: selectedMonth.year,
+        budget_type: sectorBudgetSummary.budget_type!,
+        absolute_amount: sectorBudgetSummary.absolute_amount ?? 0,
+        user1_amount: sectorBudgetSummary.user1_amount ?? 0,
+        user2_amount: sectorBudgetSummary.user2_amount ?? 0,
+        auto_rollup: sectorBudgetSummary.auto_rollup,
+      });
+      setIsYearlySectorFormOpen(true);
+    }
+  };
+
+  const handleSaveYearlySectorBudget = async () => {
+    // Add a small delay to ensure database triggers have time to execute
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await loadData();
+    setIsYearlySectorFormOpen(false);
+    setSelectedSector(null);
+    setEditingYearlySectorBudget(null);
+  };
+
+  const handleDeleteYearlyBudget = async (categoryId: string) => {
+    try {
+      const { error } = await supabase.rpc(
+        "delete_yearly_budget_for_category",
+        {
+          p_category_id: categoryId,
+          p_year: selectedMonth.year,
+        }
+      );
+
+      if (error) throw error;
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting yearly budget:", error);
+      alert("Error deleting yearly budget. Please try again.");
+    }
+  };
+
+  const handleDeleteYearlyBudgetConfirm = (categoryId: string) => {
+    setDeletingYearlyBudgetId(categoryId);
+  };
+
+  const handleDeleteYearlySectorBudgetConfirm = (sectorId: string) => {
+    setDeletingYearlySectorBudgetId(sectorId);
+  };
+
+  const handleDeleteYearlySectorBudget = async (
+    sectorId: string,
+    deleteCategoryBudgets: boolean = false
+  ) => {
+    try {
+      // Delete yearly sector budget
+      const { error: sectorError } = await supabase.rpc(
+        "delete_yearly_budget_for_sector",
+        {
+          p_sector_id: sectorId,
+          p_year: selectedMonth.year,
+        }
+      );
+
+      if (sectorError) throw sectorError;
+
+      // If checkbox is checked, also delete yearly category budgets in this sector
+      if (deleteCategoryBudgets) {
+        const sector = sectors.find((s) => s.id === sectorId);
+        if (sector && sector.category_ids.length > 0) {
+          // Delete yearly category budgets for all categories in this sector
+          for (const categoryId of sector.category_ids) {
+            const { error: categoryError } = await supabase.rpc(
+              "delete_yearly_budget_for_category",
+              {
+                p_category_id: categoryId,
+                p_year: selectedMonth.year,
+              }
+            );
+
+            if (categoryError) throw categoryError;
+          }
+        }
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting yearly sector budget:", error);
+      alert("Error deleting yearly sector budget. Please try again.");
+    }
   };
 
   const handleDeleteBudget = async (categoryId: string) => {
@@ -1203,11 +1540,18 @@ export function BudgetsPage() {
           incomeImageUrl={incomeImageUrl}
           settlementImageUrl={settlementImageUrl}
           reimbursementImageUrl={reimbursementImageUrl}
-          // Yearly budget props (placeholder for now)
-          yearlyBudgetSummaries={[]}
-          yearlySectorBudgetSummaries={[]}
+          // Yearly budget props
+          yearlyBudgetSummaries={yearlyBudgetSummaries}
+          yearlySectorBudgetSummaries={yearlySectorBudgetSummaries}
           selectedYear={selectedMonth.year}
           selectedMonthForProgress={selectedMonth.month}
+          onEditYearlyBudget={handleEditYearlyBudget}
+          onDeleteYearlyBudget={handleDeleteYearlyBudgetConfirm}
+          onEditYearlySectorBudget={handleEditYearlySectorBudget}
+          onDeleteYearlySectorBudget={handleDeleteYearlySectorBudgetConfirm}
+          onDeleteYearlySectorBudgetDirect={handleDeleteYearlySectorBudget}
+          onCreateYearlyBudget={handleCreateYearlyBudget}
+          onCreateYearlySectorBudget={handleCreateYearlySectorBudget}
         />
       )}
 
@@ -1433,6 +1777,110 @@ export function BudgetsPage() {
         </Dialog>
       )}
 
+      {/* Yearly Budget Form Dialogs */}
+      <Dialog
+        open={isYearlyFormOpen && !selectedCategory}
+        onOpenChange={setIsYearlyFormOpen}
+      >
+        <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+          <DialogHeader>
+            <DialogTitle>Add New Yearly Budget</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant="outline"
+                  className="h-auto p-3 flex flex-col items-center space-y-2 bg-card border-border text-foreground hover:bg-muted"
+                  onClick={() => handleCreateYearlyBudget(category)}
+                >
+                  {category.image_url && (
+                    <img
+                      src={category.image_url}
+                      alt={category.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  )}
+                  <span className="text-sm">{category.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Yearly Budget Form Dialog (for editing or after picking a category) */}
+      {isYearlyFormOpen && selectedCategory && (
+        <Dialog
+          open={isYearlyFormOpen && !!selectedCategory}
+          onOpenChange={setIsYearlyFormOpen}
+        >
+          <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            <BudgetForm
+              category={selectedCategory}
+              existingBudget={editingYearlyBudget || undefined}
+              selectedMonth={{ year: selectedMonth.year, month: 1 }}
+              isYearly={true}
+              sectorBudgets={yearlySectorBudgetSummaries
+                .filter((summary) => summary.budget_id) // Only include sectors with actual budgets
+                .map((summary) => ({
+                  sector_id: summary.sector_id,
+                  sector_name: summary.sector_name,
+                  budget_type: summary.budget_type!,
+                  absolute_amount: summary.absolute_amount,
+                  user1_amount: summary.user1_amount,
+                  user2_amount: summary.user2_amount,
+                  auto_rollup: summary.auto_rollup,
+                  category_ids:
+                    localSectors.find((s) => s.id === summary.sector_id)
+                      ?.category_ids || [],
+                }))}
+              currentBudgets={yearlyBudgetSummaries.map((summary) => ({
+                category_id: summary.category_id,
+                budget_type: summary.budget_type!,
+                absolute_amount: summary.absolute_amount,
+                user1_amount: summary.user1_amount,
+                user2_amount: summary.user2_amount,
+              }))}
+              onSave={handleSaveYearlyBudget}
+              onCancel={() => {
+                setIsYearlyFormOpen(false);
+                setSelectedCategory(null);
+                setEditingYearlyBudget(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Yearly Sector Budget Form Dialog (for editing or after picking a sector) */}
+      {isYearlySectorFormOpen && selectedSector && (
+        <Dialog
+          open={isYearlySectorFormOpen && !!selectedSector}
+          onOpenChange={setIsYearlySectorFormOpen}
+        >
+          <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
+            <SectorBudgetForm
+              key={editingYearlySectorBudget?.id || "new"}
+              sector={selectedSector}
+              existingBudget={editingYearlySectorBudget || undefined}
+              selectedMonth={{ year: selectedMonth.year, month: 1 }}
+              isYearly={true}
+              categoryBudgetsTotal={getYearlyCategoryBudgetsTotalForSector(
+                selectedSector.id
+              )}
+              onSave={handleSaveYearlySectorBudget}
+              onCancel={() => {
+                setIsYearlySectorFormOpen(false);
+                setSelectedSector(null);
+                setEditingYearlySectorBudget(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Copy from Month Dialog */}
       <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
         <DialogContent className="max-w-md bg-gradient-to-b from-[#004D40] to-[#26A69A]">
@@ -1613,6 +2061,72 @@ export function BudgetsPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               Delete Sector Budget for {selectedMonthName}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Yearly Budget Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deletingYearlyBudgetId}
+        onOpenChange={() => setDeletingYearlyBudgetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete Yearly Budget for {selectedMonth.year}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this yearly budget for{" "}
+              {selectedMonth.year}? This will only remove the yearly budget for
+              this specific year and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingYearlyBudgetId) {
+                  handleDeleteYearlyBudget(deletingYearlyBudgetId);
+                  setDeletingYearlyBudgetId(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Yearly Budget for {selectedMonth.year}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Yearly Sector Budget Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deletingYearlySectorBudgetId}
+        onOpenChange={() => setDeletingYearlySectorBudgetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete Yearly Sector Budget for {selectedMonth.year}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this yearly sector budget for{" "}
+              {selectedMonth.year}? This will only remove the yearly sector
+              budget for this specific year and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingYearlySectorBudgetId) {
+                  handleDeleteYearlySectorBudget(deletingYearlySectorBudgetId);
+                  setDeletingYearlySectorBudgetId(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Yearly Sector Budget for {selectedMonth.year}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

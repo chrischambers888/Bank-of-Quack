@@ -46,16 +46,16 @@ interface TabbedBudgetDisplayProps {
   yearlySectorBudgetSummaries?: YearlySectorBudgetSummary[];
   selectedYear?: number;
   selectedMonthForProgress?: number;
-  onEditYearlyBudget?: (budget: YearlyBudgetSummary) => void;
-  onDeleteYearlyBudget?: (categoryId: string) => void;
-  onEditYearlySectorBudget?: (sectorBudget: YearlySectorBudgetSummary) => void;
-  onDeleteYearlySectorBudget?: (sectorId: string) => void;
+  onEditYearlyBudget: (budget: YearlyBudgetSummary) => void;
+  onDeleteYearlyBudget: (categoryId: string) => void;
+  onEditYearlySectorBudget: (sectorBudget: YearlySectorBudgetSummary) => void;
+  onDeleteYearlySectorBudget: (sectorId: string) => void;
   onDeleteYearlySectorBudgetDirect?: (
     sectorId: string,
     deleteCategoryBudgets?: boolean
   ) => Promise<void>;
-  onCreateYearlyBudget?: (category: Category) => void;
-  onCreateYearlySectorBudget?: (sector: Sector) => void;
+  onCreateYearlyBudget: (category: Category) => void;
+  onCreateYearlySectorBudget: (sector: Sector) => void;
 }
 
 export function TabbedBudgetDisplay({
@@ -149,11 +149,14 @@ export function TabbedBudgetDisplay({
         {/* Yearly Tab */}
         <TabsContent value="yearly" className="space-y-6">
           <YearlyBudgetDisplay
+            sectors={sectors}
+            categories={categories}
             yearlyBudgetSummaries={yearlyBudgetSummaries}
             yearlySectorBudgetSummaries={yearlySectorBudgetSummaries}
             selectedYear={selectedYear}
             selectedMonthForProgress={selectedMonthForProgress}
-            categories={categories}
+            user1AvatarUrl={user1AvatarUrl}
+            user2AvatarUrl={user2AvatarUrl}
             onEditYearlyBudget={onEditYearlyBudget}
             onDeleteYearlyBudget={onDeleteYearlyBudget}
             onEditYearlySectorBudget={onEditYearlySectorBudget}
@@ -161,6 +164,14 @@ export function TabbedBudgetDisplay({
             onDeleteYearlySectorBudgetDirect={onDeleteYearlySectorBudgetDirect}
             onCreateYearlyBudget={onCreateYearlyBudget}
             onCreateYearlySectorBudget={onCreateYearlySectorBudget}
+            userNames={userNames}
+            deleteTransaction={deleteTransaction}
+            handleSetEditingTransaction={handleSetEditingTransaction}
+            onToggleExclude={onToggleExclude}
+            allTransactions={allTransactions}
+            incomeImageUrl={incomeImageUrl}
+            settlementImageUrl={settlementImageUrl}
+            reimbursementImageUrl={reimbursementImageUrl}
           />
         </TabsContent>
       </Tabs>

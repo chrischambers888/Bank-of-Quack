@@ -510,10 +510,10 @@ export function MonthlyBudgetDisplay({
                                 {sector?.name || "Unknown"}
                               </td>
                               <td className="py-3 px-4 text-right font-medium">
-                                ${totalBudget.toFixed(2)}
+                                {formatCurrency(totalBudget)}
                               </td>
                               <td className="py-3 px-4 text-right text-muted-foreground">
-                                ${spent.toFixed(2)}
+                                {formatCurrency(spent)}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <span
@@ -523,7 +523,7 @@ export function MonthlyBudgetDisplay({
                                       : "text-red-600 font-medium"
                                   }
                                 >
-                                  ${remaining.toFixed(2)}
+                                  {formatCurrency(remaining)}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-center">
@@ -594,13 +594,13 @@ export function MonthlyBudgetDisplay({
                           <div>
                             <p className="text-muted-foreground">Budget</p>
                             <p className="font-medium">
-                              ${totalBudget.toFixed(2)}
+                              {formatCurrency(totalBudget)}
                             </p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Spent</p>
                             <p className="text-muted-foreground">
-                              ${spent.toFixed(2)}
+                              {formatCurrency(spent)}
                             </p>
                           </div>
                           <div>
@@ -612,7 +612,7 @@ export function MonthlyBudgetDisplay({
                                   : "text-red-600 font-medium"
                               }
                             >
-                              ${remaining.toFixed(2)}
+                              {formatCurrency(remaining)}
                             </p>
                           </div>
                         </div>

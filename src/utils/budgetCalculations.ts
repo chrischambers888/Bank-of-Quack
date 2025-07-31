@@ -268,7 +268,7 @@ export const calculateYearlyCategorySpent = (
 ): number => {
   // Calculate spent from January to the selected month
   const startDate = new Date(year, 0, 1); // January 1st of the year
-  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  const endDate = new Date(year, month, 0); // Last day of the selected month
   endDate.setHours(23, 59, 59, 999);
 
   const categoryTransactions = allTransactions.filter(
@@ -299,7 +299,7 @@ export const calculateYearlyCategoryUser1Spent = (
 ): number => {
   // Calculate spent from January to the selected month
   const startDate = new Date(year, 0, 1); // January 1st of the year
-  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  const endDate = new Date(year, month, 0); // Last day of the selected month
   endDate.setHours(23, 59, 59, 999);
 
   const categoryTransactions = allTransactions.filter(
@@ -338,7 +338,7 @@ export const calculateYearlyCategoryUser2Spent = (
 ): number => {
   // Calculate spent from January to the selected month
   const startDate = new Date(year, 0, 1); // January 1st of the year
-  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  const endDate = new Date(year, month, 0); // Last day of the selected month
   endDate.setHours(23, 59, 59, 999);
 
   const categoryTransactions = allTransactions.filter(
@@ -377,7 +377,7 @@ export const calculateYearlySectorSpent = (
 ): number => {
   // Calculate spent from January to the selected month
   const startDate = new Date(year, 0, 1); // January 1st of the year
-  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  const endDate = new Date(year, month, 0); // Last day of the selected month
   endDate.setHours(23, 59, 59, 999);
 
   const sectorTransactions = allTransactions.filter(
@@ -408,7 +408,7 @@ export const calculateYearlySectorUser1Spent = (
 ): number => {
   // Calculate spent from January to the selected month
   const startDate = new Date(year, 0, 1); // January 1st of the year
-  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  const endDate = new Date(year, month, 0); // Last day of the selected month
   endDate.setHours(23, 59, 59, 999);
 
   const sectorTransactions = allTransactions.filter(
@@ -447,7 +447,7 @@ export const calculateYearlySectorUser2Spent = (
 ): number => {
   // Calculate spent from January to the selected month
   const startDate = new Date(year, 0, 1); // January 1st of the year
-  const endDate = new Date(year, month - 1, 0); // Last day of the selected month
+  const endDate = new Date(year, month, 0); // Last day of the selected month
   endDate.setHours(23, 59, 59, 999);
 
   const sectorTransactions = allTransactions.filter(

@@ -7,6 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatCurrency } from "./budgetUtils";
 
 interface BudgetStatsProps {
   totalBudget: number;
@@ -33,7 +34,9 @@ export function BudgetStats({
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${totalBudget.toFixed(2)}</div>
+          <div className="text-2xl font-bold">
+            {formatCurrency(totalBudget)}
+          </div>
           <p className="text-xs text-muted-foreground">{monthName}'s budget</p>
         </CardContent>
       </Card>
@@ -80,7 +83,7 @@ export function BudgetStats({
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${totalSpent.toFixed(2)}</div>
+          <div className="text-2xl font-bold">{formatCurrency(totalSpent)}</div>
           <p className="text-xs text-muted-foreground">
             {overallPercentage.toFixed(1)}% of budget used
           </p>
@@ -98,7 +101,7 @@ export function BudgetStats({
               totalRemaining < 0 ? "text-red-600" : "text-green-600"
             }`}
           >
-            ${Math.abs(totalRemaining).toFixed(2)}
+            {formatCurrency(Math.abs(totalRemaining))}
           </div>
           <p className="text-xs text-muted-foreground">
             {totalRemaining < 0 ? "Over budget" : "Available"}

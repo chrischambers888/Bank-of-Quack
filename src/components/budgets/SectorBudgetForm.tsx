@@ -13,6 +13,7 @@ import {
 import {
   Sector,
   SectorBudget,
+  YearlySectorBudget,
   SectorBudgetFormData,
   SelectedMonth,
 } from "@/types";
@@ -21,10 +22,11 @@ import { useAppData } from "@/hooks/useAppData";
 
 interface SectorBudgetFormProps {
   sector: Sector;
-  existingBudget?: SectorBudget;
+  existingBudget?: SectorBudget | YearlySectorBudget;
   selectedMonth: SelectedMonth;
   onSave: () => void;
   onCancel: () => void;
+  isYearly?: boolean;
   categoryBudgetsTotal?: number; // Add this to get the sum of category budgets
 }
 
@@ -34,19 +36,20 @@ export function SectorBudgetForm({
   selectedMonth,
   onSave,
   onCancel,
+  isYearly = false,
   categoryBudgetsTotal = 0,
 }: SectorBudgetFormProps) {
   const { userNames } = useAppData();
   const [formData, setFormData] = useState<SectorBudgetFormData>(() => {
     // Initialize with existing budget data if available
-    if (existingBudget) {
+    if (existingBudget && existingBudget.budget_type) {
       return {
         sector_id: existingBudget.sector_id,
         budget_type: existingBudget.budget_type,
         absolute_amount: existingBudget.absolute_amount ?? 0,
         user1_amount: existingBudget.user1_amount ?? 0,
         user2_amount: existingBudget.user2_amount ?? 0,
-        auto_rollup: existingBudget.auto_rollup,
+        auto_rollup: existingBudget.auto_rollup ?? true,
       };
     }
     // Default values for new budget
@@ -62,6 +65,30 @@ export function SectorBudgetForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Update form data when existingBudget changes
+  useEffect(() => {
+    if (existingBudget && existingBudget.budget_type) {
+      setFormData({
+        sector_id: existingBudget.sector_id,
+        budget_type: existingBudget.budget_type,
+        absolute_amount: existingBudget.absolute_amount ?? 0,
+        user1_amount: existingBudget.user1_amount ?? 0,
+        user2_amount: existingBudget.user2_amount ?? 0,
+        auto_rollup: existingBudget.auto_rollup ?? true,
+      });
+    } else {
+      // Reset to default values for new budget
+      setFormData({
+        sector_id: sector.id,
+        budget_type: "absolute",
+        absolute_amount: 0,
+        user1_amount: 0,
+        user2_amount: 0,
+        auto_rollup: true,
+      });
+    }
+  }, [existingBudget, sector.id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -76,25 +103,98 @@ export function SectorBudgetForm({
     }
 
     try {
-      const { error } = await supabase.rpc("create_sector_budget_for_month", {
-        p_sector_id: formData.sector_id,
-        p_year: selectedMonth.year,
-        p_month: selectedMonth.month,
-        p_budget_type: formData.budget_type,
-        p_absolute_amount:
-          formData.budget_type === "absolute"
-            ? formData.auto_rollup
-              ? categoryBudgetsTotal
-              : formData.absolute_amount
-            : null,
-        p_user1_amount:
-          formData.budget_type === "split" ? formData.user1_amount : null,
-        p_user2_amount:
-          formData.budget_type === "split" ? formData.user2_amount : null,
-        p_auto_rollup: formData.auto_rollup,
-      });
-
-      if (error) throw error;
+      if (isYearly) {
+        if (existingBudget) {
+          // Update existing yearly sector budget
+          const { error } = await supabase.rpc(
+            "update_yearly_budget_for_sector",
+            {
+              p_budget_id: existingBudget.id,
+              p_budget_type: formData.budget_type,
+              p_absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.auto_rollup
+                    ? categoryBudgetsTotal
+                    : formData.absolute_amount
+                  : null,
+              p_user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              p_user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+              p_auto_rollup: formData.auto_rollup,
+            }
+          );
+          if (error) throw error;
+        } else {
+          // Create new yearly sector budget
+          const { error } = await supabase.rpc(
+            "create_yearly_budget_for_sector",
+            {
+              p_sector_id: formData.sector_id,
+              p_year: selectedMonth.year,
+              p_budget_type: formData.budget_type,
+              p_absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.auto_rollup
+                    ? categoryBudgetsTotal
+                    : formData.absolute_amount
+                  : null,
+              p_user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              p_user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+              p_auto_rollup: formData.auto_rollup,
+            }
+          );
+          if (error) throw error;
+        }
+      } else {
+        if (existingBudget) {
+          // Update existing monthly sector budget
+          const { error } = await supabase.rpc(
+            "update_sector_budget_for_month",
+            {
+              p_budget_id: existingBudget.id,
+              p_budget_type: formData.budget_type,
+              p_absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.auto_rollup
+                    ? categoryBudgetsTotal
+                    : formData.absolute_amount
+                  : null,
+              p_user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              p_user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+              p_auto_rollup: formData.auto_rollup,
+            }
+          );
+          if (error) throw error;
+        } else {
+          // Create new monthly sector budget
+          const { error } = await supabase.rpc(
+            "create_sector_budget_for_month",
+            {
+              p_sector_id: formData.sector_id,
+              p_year: selectedMonth.year,
+              p_month: selectedMonth.month,
+              p_budget_type: formData.budget_type,
+              p_absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.auto_rollup
+                    ? categoryBudgetsTotal
+                    : formData.absolute_amount
+                  : null,
+              p_user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              p_user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+              p_auto_rollup: formData.auto_rollup,
+            }
+          );
+          if (error) throw error;
+        }
+      }
       onSave();
     } catch (error) {
       console.error("Error saving sector budget:", error);
@@ -355,8 +455,11 @@ export function SectorBudgetForm({
               setFormData((prev) => ({
                 ...prev,
                 auto_rollup: checked,
-                // Clear amount when auto-rollup is enabled
-                absolute_amount: checked ? 0 : prev.absolute_amount,
+                // When auto-rollup is enabled, set the amount to the category budgets total
+                // When disabled, keep the current amount or set to 0 if it was auto-calculated
+                absolute_amount: checked
+                  ? categoryBudgetsTotal
+                  : prev.absolute_amount || 0,
               }))
             }
           />

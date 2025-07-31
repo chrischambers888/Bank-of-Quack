@@ -11,15 +11,21 @@ import {
 } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Switch } from "@/components/ui/switch";
-import { Category, BudgetFormData, CategoryBudget } from "@/types";
+import {
+  Category,
+  BudgetFormData,
+  CategoryBudget,
+  YearlyCategoryBudget,
+} from "@/types";
 import { supabase } from "@/supabaseClient";
 
 interface BudgetFormProps {
   category: Category;
-  existingBudget?: CategoryBudget;
+  existingBudget?: CategoryBudget | YearlyCategoryBudget;
   selectedMonth?: { year: number; month: number };
   onSave: () => void;
   onCancel: () => void;
+  isYearly?: boolean;
   sectorBudgets?: Array<{
     sector_id: string;
     sector_name: string;
@@ -45,6 +51,7 @@ export function BudgetForm({
   selectedMonth,
   onSave,
   onCancel,
+  isYearly = false,
   sectorBudgets = [],
   currentBudgets = [],
 }: BudgetFormProps) {
@@ -123,42 +130,79 @@ export function BudgetForm({
     try {
       if (existingBudget) {
         // Update existing budget
-        const { error } = await supabase.rpc("update_budget_for_month", {
-          p_budget_id: existingBudget.id,
-          p_budget_type: formData.budget_type,
-          p_absolute_amount:
-            formData.budget_type === "absolute"
-              ? formData.absolute_amount
-              : null,
-          p_user1_amount:
-            formData.budget_type === "split" ? formData.user1_amount : null,
-          p_user2_amount:
-            formData.budget_type === "split" ? formData.user2_amount : null,
-        });
-
-        if (error) throw error;
+        if (isYearly) {
+          const { error } = await supabase.rpc(
+            "update_yearly_budget_for_category",
+            {
+              p_budget_id: existingBudget.id,
+              p_budget_type: formData.budget_type,
+              p_absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.absolute_amount
+                  : null,
+              p_user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              p_user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+            }
+          );
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.rpc("update_budget_for_month", {
+            p_budget_id: existingBudget.id,
+            p_budget_type: formData.budget_type,
+            p_absolute_amount:
+              formData.budget_type === "absolute"
+                ? formData.absolute_amount
+                : null,
+            p_user1_amount:
+              formData.budget_type === "split" ? formData.user1_amount : null,
+            p_user2_amount:
+              formData.budget_type === "split" ? formData.user2_amount : null,
+          });
+          if (error) throw error;
+        }
       } else {
-        // Create new budget for the selected month
+        // Create new budget
         const currentDate = new Date();
         const year = selectedMonth?.year || currentDate.getFullYear();
         const month = selectedMonth?.month || currentDate.getMonth() + 1;
 
-        const { error } = await supabase.rpc("create_budget_for_month", {
-          p_category_id: formData.category_id,
-          p_year: year,
-          p_month: month,
-          p_budget_type: formData.budget_type,
-          p_absolute_amount:
-            formData.budget_type === "absolute"
-              ? formData.absolute_amount
-              : null,
-          p_user1_amount:
-            formData.budget_type === "split" ? formData.user1_amount : null,
-          p_user2_amount:
-            formData.budget_type === "split" ? formData.user2_amount : null,
-        });
-
-        if (error) throw error;
+        if (isYearly) {
+          const { error } = await supabase.rpc(
+            "create_yearly_budget_for_category",
+            {
+              p_category_id: formData.category_id,
+              p_year: year,
+              p_budget_type: formData.budget_type,
+              p_absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.absolute_amount
+                  : null,
+              p_user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              p_user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+            }
+          );
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.rpc("create_budget_for_month", {
+            p_category_id: formData.category_id,
+            p_year: year,
+            p_month: month,
+            p_budget_type: formData.budget_type,
+            p_absolute_amount:
+              formData.budget_type === "absolute"
+                ? formData.absolute_amount
+                : null,
+            p_user1_amount:
+              formData.budget_type === "split" ? formData.user1_amount : null,
+            p_user2_amount:
+              formData.budget_type === "split" ? formData.user2_amount : null,
+          });
+          if (error) throw error;
+        }
       }
 
       onSave();
