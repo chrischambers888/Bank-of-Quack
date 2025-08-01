@@ -423,6 +423,156 @@ export function YearlySectorBudgetCard({
                 : "over"}
             </span>
           </div>
+
+          {/* User Spending Breakdown - Show in modal context */}
+          {hideTransactionsButton &&
+            ((current_period_user1_spent || 0) > 0 ||
+              (current_period_user2_spent || 0) > 0) && (
+              <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                <div className="flex justify-between items-center">
+                  <span>
+                    {userNames.user1}:{" "}
+                    {formatCurrency(current_period_user1_spent)}
+                    {budget_type === "split" &&
+                      ` / ${formatCurrency(user1_amount)}`}
+                  </span>
+                  <span>
+                    {userNames.user2}:{" "}
+                    {formatCurrency(current_period_user2_spent)}
+                    {budget_type === "split" &&
+                      ` / ${formatCurrency(user2_amount)}`}
+                  </span>
+                </div>
+                <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
+                  {/* User 1 Progress */}
+                  <div
+                    className="absolute left-0 h-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }%`,
+                      backgroundColor:
+                        budget_type === "split"
+                          ? // For split budgets, use color coding based on budget adherence
+                            (current_period_budget === 0 &&
+                              (current_period_user1_spent || 0) > 0) ||
+                            (current_period_user1_spent || 0) >=
+                              (user1_amount || 0)
+                            ? "rgb(239 68 68)"
+                            : (current_period_user1_spent || 0) >=
+                              (user1_amount || 0) * 0.8
+                            ? "rgb(234 179 8)"
+                            : "rgb(34 197 94)"
+                          : // For absolute budgets, use neutral gray
+                            "rgb(156 163 175)",
+                    }}
+                  />
+                  {/* User 2 Progress */}
+                  <div
+                    className="absolute right-0 h-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        ((current_period_user2_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }%`,
+                      backgroundColor:
+                        budget_type === "split"
+                          ? // For split budgets, use color coding based on budget adherence
+                            (current_period_budget === 0 &&
+                              (current_period_user2_spent || 0) > 0) ||
+                            (current_period_user2_spent || 0) >=
+                              (user2_amount || 0)
+                            ? "rgb(239 68 68)"
+                            : (current_period_user2_spent || 0) >=
+                              (user2_amount || 0) * 0.8
+                            ? "rgb(234 179 8)"
+                            : "rgb(34 197 94)"
+                          : // For absolute budgets, use neutral gray
+                            "rgb(156 163 175)",
+                    }}
+                  />
+                  {/* User 1 Avatar */}
+                  <div
+                    className="absolute top-1/2 flex items-center justify-center"
+                    style={{
+                      left: `calc(${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }% / 2)`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                      {user1AvatarUrl ? (
+                        <img
+                          src={user1AvatarUrl}
+                          alt={`${userNames.user1} avatar`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-white font-bold">
+                          {userNames.user1.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* User 2 Avatar */}
+                  <div
+                    className="absolute top-1/2 flex items-center justify-center"
+                    style={{
+                      left: `calc(${
+                        ((current_period_user1_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }% + (${
+                        ((current_period_user2_spent || 0) /
+                          Math.max(
+                            (current_period_user1_spent || 0) +
+                              (current_period_user2_spent || 0),
+                            1
+                          )) *
+                        100
+                      }% / 2))`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                      {user2AvatarUrl ? (
+                        <img
+                          src={user2AvatarUrl}
+                          alt={`${userNames.user2} avatar`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-white font-bold">
+                          {userNames.user2.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Expandable Category Budgets */}
@@ -480,6 +630,7 @@ export function YearlySectorBudgetCard({
                     reimbursementImageUrl={reimbursementImageUrl}
                     categories={categories}
                     exclusionType={exclusionType}
+                    hideTransactionsButton={false}
                   />
                 );
               })}

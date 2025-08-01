@@ -6,32 +6,31 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { BudgetCard } from "./BudgetCard";
-import { SectorBudgetCard } from "./SectorBudgetCard";
-import { CategoryBudgetCard } from "./CategoryBudgetCard";
+import { YearlySectorBudgetCard } from "./YearlySectorBudgetCard";
+import { YearlyCategoryBudgetCard } from "./YearlyCategoryBudgetCard";
 import TransactionList from "@/components/TransactionList";
 import {
-  BudgetSummary,
-  SectorBudgetSummary,
+  YearlyBudgetSummary,
+  YearlySectorBudgetSummary,
   Sector,
   Category,
   Transaction,
-  SelectedMonth,
 } from "@/types";
 
-interface BudgetModalProps {
+interface YearlyBudgetModalProps {
   modalData: {
     type: "sector" | "category";
     data: any;
     transactions: Transaction[];
   } | null;
   onClose: () => void;
-  selectedMonth: SelectedMonth;
+  selectedYear: number;
+  selectedMonthForProgress: number;
   user1AvatarUrl?: string | null;
   user2AvatarUrl?: string | null;
   onEditBudget: (budget: any) => void;
   onDeleteBudget: (categoryId: string) => void;
-  onEditSectorBudget: (sectorBudget: SectorBudgetSummary) => void;
+  onEditSectorBudget: (sectorBudget: YearlySectorBudgetSummary) => void;
   onDeleteSectorBudget: (sectorId: string) => void;
   onCreateSectorBudget: (sector: Sector) => void;
   userNames: string[];
@@ -46,15 +45,16 @@ interface BudgetModalProps {
   incomeImageUrl?: string | null;
   settlementImageUrl?: string | null;
   reimbursementImageUrl?: string | null;
-  budgetSummaries: BudgetSummary[];
+  budgetSummaries: YearlyBudgetSummary[];
   sectors: Sector[];
   categories: Category[];
 }
 
-export function BudgetModal({
+export function YearlyBudgetModal({
   modalData,
   onClose,
-  selectedMonth,
+  selectedYear,
+  selectedMonthForProgress,
   user1AvatarUrl,
   user2AvatarUrl,
   onEditBudget,
@@ -73,7 +73,7 @@ export function BudgetModal({
   budgetSummaries,
   sectors,
   categories,
-}: BudgetModalProps) {
+}: YearlyBudgetModalProps) {
   if (!modalData) return null;
 
   return (
@@ -82,63 +82,96 @@ export function BudgetModal({
         <DialogHeader className="border-b border-white/20 pb-4 pt-6">
           <DialogTitle className="text-xl font-semibold text-white">
             {modalData.type === "sector"
-              ? `${modalData.data.sector.name} Budget Details`
-              : `${modalData.data.category?.name} Budget Details`}
+              ? `${modalData.data.sector.name} Budget Details - ${selectedYear}`
+              : `${modalData.data.category?.name} Budget Details - ${selectedYear}`}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-6 pt-4">
           {/* Budget Card */}
           {modalData.type === "sector" ? (
             modalData.data.sectorBudget?.budget_id ? (
-              <SectorBudgetCard
-                sectorBudgetSummary={modalData.data.sectorBudget}
-                selectedMonth={selectedMonth}
-                user1AvatarUrl={user1AvatarUrl}
-                user2AvatarUrl={user2AvatarUrl}
-                onEdit={onEditSectorBudget}
-                onDelete={onDeleteSectorBudget}
-                budgetSummaries={budgetSummaries}
-                sectors={sectors}
-                allTransactions={allTransactions}
-                deleteTransaction={deleteTransaction}
-                handleSetEditingTransaction={handleSetEditingTransaction}
-                onToggleExclude={onToggleExclude}
-                incomeImageUrl={incomeImageUrl}
-                settlementImageUrl={settlementImageUrl}
-                reimbursementImageUrl={reimbursementImageUrl}
-                hideTransactionsButton={true}
-              />
+              <>
+                <YearlySectorBudgetCard
+                  sectorBudgetSummary={modalData.data.sectorBudget}
+                  selectedYear={selectedYear}
+                  selectedMonthForProgress={selectedMonthForProgress}
+                  user1AvatarUrl={user1AvatarUrl}
+                  user2AvatarUrl={user2AvatarUrl}
+                  onEdit={onEditSectorBudget}
+                  onDelete={onDeleteSectorBudget}
+                  budgetSummaries={budgetSummaries}
+                  sectors={sectors}
+                  categories={categories}
+                  onEditBudget={onEditBudget}
+                  onDeleteBudget={onDeleteBudget}
+                  userNames={{ user1: userNames[0], user2: userNames[1] }}
+                  getMonthName={(month: number) => {
+                    const months = [
+                      "January",
+                      "February",
+                      "March",
+                      "April",
+                      "May",
+                      "June",
+                      "July",
+                      "August",
+                      "September",
+                      "October",
+                      "November",
+                      "December",
+                    ];
+                    return months[month - 1] || "Unknown";
+                  }}
+                  formatCurrency={(amount: number | null | undefined) => {
+                    if (amount === null || amount === undefined) return "$0.00";
+                    return new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(amount);
+                  }}
+                  allTransactions={allTransactions}
+                  deleteTransaction={deleteTransaction}
+                  handleSetEditingTransaction={handleSetEditingTransaction}
+                  onToggleExclude={onToggleExclude}
+                  incomeImageUrl={incomeImageUrl}
+                  settlementImageUrl={settlementImageUrl}
+                  reimbursementImageUrl={reimbursementImageUrl}
+                  hideTransactionsButton={true}
+                  exclusionType="yearly"
+                />
+              </>
             ) : (
               <div className="text-center py-8">
-                <p className="text-white/80 mb-4">No sector budget found</p>
-                <p className="text-white/60 text-sm mb-4">
-                  Transactions are shown below, but spending is not tracked at
-                  the sector level without a budget.
-                </p>
-                <Button
-                  onClick={() => onCreateSectorBudget(modalData.data.sector)}
-                  className="bg-white/10 hover:bg-white/20 text-white"
-                >
-                  Create Sector Budget
-                </Button>
+                <p className="text-white/80">No sector budget found.</p>
               </div>
             )
-          ) : (
-            <CategoryBudgetCard
+          ) : modalData.data.budgetSummary?.budget_id ? (
+            <YearlyCategoryBudgetCard
               budgetSummary={modalData.data.budgetSummary}
-              onEdit={onEditBudget}
-              onDelete={onDeleteBudget}
-              selectedMonth={selectedMonth}
+              selectedYear={selectedYear}
+              selectedMonthForProgress={selectedMonthForProgress}
               user1AvatarUrl={user1AvatarUrl}
               user2AvatarUrl={user2AvatarUrl}
+              onEdit={onEditBudget}
+              onDelete={onDeleteBudget}
               category={modalData.data.category}
               userNames={{ user1: userNames[0], user2: userNames[1] }}
-              getMonthName={(month: SelectedMonth) => {
-                const date = new Date(month.year, month.month - 1, 1);
-                return date.toLocaleDateString("en-US", {
-                  month: "long",
-                  year: "numeric",
-                });
+              getMonthName={(month: number) => {
+                const months = [
+                  "January",
+                  "February",
+                  "March",
+                  "April",
+                  "May",
+                  "June",
+                  "July",
+                  "August",
+                  "September",
+                  "October",
+                  "November",
+                  "December",
+                ];
+                return months[month - 1] || "Unknown";
               }}
               formatCurrency={(amount: number | null | undefined) => {
                 if (amount === null || amount === undefined) return "$0.00";
@@ -156,29 +189,24 @@ export function BudgetModal({
               reimbursementImageUrl={reimbursementImageUrl}
               hideTransactionsButton={true}
               categories={categories}
+              exclusionType="yearly"
             />
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-white/80">No category budget found.</p>
+            </div>
           )}
 
-          {/* Transactions Section */}
-          <div className="border-t border-white/20 pt-6">
+          {/* Transactions List */}
+          <div className="space-y-4">
             <TransactionList
               transactions={modalData.transactions}
-              categories={categories}
               userNames={userNames}
-              showValues={true}
-              deleteTransaction={deleteTransaction}
-              handleSetEditingTransaction={(transaction) => {
-                handleSetEditingTransaction(transaction);
-                onClose(); // Close the modal
-              }}
-              allTransactions={allTransactions}
-              variant="dialog"
+              categories={categories}
+              hideIncome={false}
               showExcludeOption={true}
               onToggleExclude={onToggleExclude}
-              exclusionType="monthly"
-              incomeImageUrl={incomeImageUrl}
-              settlementImageUrl={settlementImageUrl}
-              reimbursementImageUrl={reimbursementImageUrl}
+              exclusionType="yearly"
             />
           </div>
         </div>

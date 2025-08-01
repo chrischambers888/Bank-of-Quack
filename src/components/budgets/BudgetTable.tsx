@@ -214,14 +214,6 @@ export function BudgetTable({
                                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
                               </div>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 hover:bg-muted/50"
-                              onClick={() => onOpenSectorModal(sector)}
-                            >
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                            </Button>
                           </div>
                         </td>
                         {sectorBudget?.budget_id ? (
@@ -323,6 +315,15 @@ export function BudgetTable({
                         )}
                         <td className="text-center py-3 px-4">
                           <div className="flex justify-center space-x-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onOpenSectorModal(sector)}
+                              className="h-8 px-3"
+                              title="View transactions for this sector"
+                            >
+                              <HelpCircle className="h-3 w-3" />
+                            </Button>
                             {sectorBudget?.budget_id ? (
                               <>
                                 <Button
@@ -421,16 +422,6 @@ export function BudgetTable({
                                           <span className="text-sm">
                                             {budgetSummary.category_name}
                                           </span>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-4 w-4 p-0 hover:bg-muted/50"
-                                            onClick={() =>
-                                              onOpenCategoryModal(budgetSummary)
-                                            }
-                                          >
-                                            <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                                          </Button>
                                         </div>
                                       </td>
                                       <td className="text-right py-2 px-4 text-sm">
@@ -483,6 +474,17 @@ export function BudgetTable({
                                       </td>
                                       <td className="text-center py-2 px-4">
                                         <div className="flex justify-center space-x-1">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                              onOpenCategoryModal(budgetSummary)
+                                            }
+                                            className="h-8 px-3"
+                                            title="View transactions for this category"
+                                          >
+                                            <HelpCircle className="h-3 w-3" />
+                                          </Button>
                                           <Button
                                             size="sm"
                                             variant="outline"

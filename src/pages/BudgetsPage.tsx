@@ -2012,6 +2012,7 @@ export function BudgetsPage() {
           onDeleteYearlySectorBudgetDirect={handleDeleteYearlySectorBudget}
           onCreateYearlyBudget={handleCreateYearlyBudget}
           onCreateYearlySectorBudget={handleCreateYearlySectorBudget}
+          onOpenCategoryModal={handleEditYearlyBudget}
         />
       )}
 

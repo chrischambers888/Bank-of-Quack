@@ -48,6 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import { SectorBudgetCard } from "./SectorBudgetCard";
 import { YearlySectorBudgetCard } from "./YearlySectorBudgetCard";
 import { YearlyCategoryBudgetCard } from "./YearlyCategoryBudgetCard";
+import { YearlyBudgetModal } from "./YearlyBudgetModal";
 
 interface YearlyBudgetDisplayProps {
   sectors: Sector[];
@@ -68,6 +69,7 @@ interface YearlyBudgetDisplayProps {
   ) => Promise<void>;
   onCreateYearlyBudget: (category: Category) => void;
   onCreateYearlySectorBudget: (sector: Sector) => void;
+  onOpenCategoryModal: (budgetSummary: YearlyBudgetSummary) => void;
   userNames: string[];
   deleteTransaction: (id: string) => Promise<void>;
   handleSetEditingTransaction: (transaction: any) => void;
@@ -101,6 +103,7 @@ export function YearlyBudgetDisplay({
   onDeleteYearlySectorBudgetDirect,
   onCreateYearlyBudget,
   onCreateYearlySectorBudget,
+  onOpenCategoryModal,
   userNames,
   deleteTransaction,
   handleSetEditingTransaction,
@@ -239,7 +242,7 @@ export function YearlyBudgetDisplay({
   // Get excluded transactions for the selected year
   const getExcludedTransactions = () => {
     const startDate = new Date(selectedYear, 0, 1); // January 1st of selected year
-    const endDate = new Date(selectedYear, 11, 31); // December 31st of selected year
+    const endDate = new Date(selectedYear, selectedMonthForProgress, 0); // Last day of current progress month
     endDate.setHours(23, 59, 59, 999);
 
     return allTransactions.filter((t) => {
@@ -287,6 +290,102 @@ export function YearlyBudgetDisplay({
       default:
         return splitType || "N/A";
     }
+  };
+
+  const openSectorModal = async (sector: Sector) => {
+    const sectorBudget = yearlySectorBudgetSummaries.find(
+      (s) => s.sector_id === sector.id
+    );
+    const sectorCategories = categories.filter((c) =>
+      sector.category_ids.includes(c.id)
+    );
+    const sectorBudgets = yearlyBudgetSummaries.filter((budget) =>
+      sector.category_ids.includes(budget.category_id)
+    );
+
+    // Fetch transactions for all categories in the sector up to the current progress month
+    const { data: transactions } = await supabase
+      .from("transactions")
+      .select("*")
+      .in("category_id", sector.category_ids)
+      .gte("date", `${selectedYear}-01-01`)
+      .lt(
+        "date",
+        `${selectedYear}-${String(selectedMonthForProgress + 1).padStart(
+          2,
+          "0"
+        )}-01`
+      )
+      .order("date", { ascending: false });
+
+    // Find reimbursements that reimburse these transactions
+    const relevantExpenseIds = (transactions || []).map((t) => t.id);
+    const relevantReimbursements = allTransactions.filter(
+      (t) =>
+        t.transaction_type === "reimbursement" &&
+        t.reimburses_transaction_id &&
+        relevantExpenseIds.includes(t.reimburses_transaction_id)
+    );
+
+    const finalTransactions = [
+      ...(transactions || []),
+      ...relevantReimbursements,
+    ];
+
+    // Set modal data to open the sector modal with transactions
+    setModalData({
+      type: "sector",
+      data: {
+        sector,
+        sectorBudget,
+        sectorCategories,
+        sectorBudgets,
+      },
+      transactions: finalTransactions,
+    });
+  };
+
+  const openCategoryModal = async (budget: YearlyBudgetSummary) => {
+    const category = categories.find((c) => c.id === budget.category_id);
+
+    // Fetch transactions for this specific category up to the current progress month
+    const { data: transactions } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("category_id", budget.category_id)
+      .gte("date", `${selectedYear}-01-01`)
+      .lt(
+        "date",
+        `${selectedYear}-${String(selectedMonthForProgress + 1).padStart(
+          2,
+          "0"
+        )}-01`
+      )
+      .order("date", { ascending: false });
+
+    // Find reimbursements that reimburse these transactions
+    const relevantExpenseIds = (transactions || []).map((t) => t.id);
+    const relevantReimbursements = allTransactions.filter(
+      (t) =>
+        t.transaction_type === "reimbursement" &&
+        t.reimburses_transaction_id &&
+        relevantExpenseIds.includes(t.reimburses_transaction_id)
+    );
+
+    const finalTransactions = [
+      ...(transactions || []),
+      ...relevantReimbursements,
+    ];
+
+    // Set modal data to open the category modal with transactions
+    setModalData({
+      type: "category",
+      data: {
+        budgetSummary: budget,
+        category,
+      },
+      transactions: finalTransactions,
+    });
   };
 
   // If no sectors exist, show a different empty state
@@ -366,135 +465,189 @@ export function YearlyBudgetDisplay({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {sectors.map((sector) => {
-                    const sectorBudget = yearlySectorBudgetSummaries.find(
-                      (s) => s.sector_id === sector.id
-                    );
-                    const sectorCategories = categories.filter((c) =>
-                      sector.category_ids.includes(c.id)
-                    );
-                    const sectorBudgets = yearlyBudgetSummaries.filter(
-                      (budget) =>
-                        sector.category_ids.includes(budget.category_id)
-                    );
+                  {sectors
+                    .map((sector) => {
+                      const sectorBudget = yearlySectorBudgetSummaries.find(
+                        (s) => s.sector_id === sector.id
+                      );
+                      const sectorCategories = categories.filter((c) =>
+                        sector.category_ids.includes(c.id)
+                      );
+                      const sectorBudgets = yearlyBudgetSummaries.filter(
+                        (budget) =>
+                          sector.category_ids.includes(budget.category_id)
+                      );
 
-                    const isExpanded = expandedSectors.has(sector.id);
+                      // Calculate percentage used for sorting
+                      const sectorPercentage =
+                        sectorBudget?.current_period_budget &&
+                        sectorBudget.current_period_budget > 0
+                          ? ((sectorBudget.current_period_spent || 0) /
+                              sectorBudget.current_period_budget) *
+                            100
+                          : 0;
 
-                    return (
-                      <React.Fragment key={sector.id}>
-                        {/* Sector Row */}
-                        <tr className="bg-muted/30 hover:bg-muted/50">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => toggleSectorExpansion(sector.id)}
-                                className="p-1 hover:bg-muted rounded"
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </button>
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-semibold">
-                                {sector.name}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                ({sectorCategories.length} categories)
-                              </span>
-                              {getSectorsWithoutYearlyBudgets(
-                                sectors,
-                                yearlyBudgetSummaries,
-                                yearlySectorBudgetSummaries
-                              ).some((s) => s.id === sector.id) && (
-                                <div
-                                  onMouseEnter={(e) =>
-                                    showTooltip(
-                                      "Sector has categories with yearly budgets but no yearly sector budget",
-                                      e
-                                    )
-                                  }
-                                  onMouseLeave={hideTooltip}
-                                  onTouchStart={(e) =>
-                                    showTooltip(
-                                      "Sector has categories with yearly budgets but no yearly sector budget",
-                                      e
-                                    )
-                                  }
-                                >
-                                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          {sectorBudget?.budget_id ? (
-                            <>
-                              <td className="py-3 px-4 text-right font-medium">
-                                {formatCurrency(
-                                  sectorBudget.current_period_budget || 0
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-right text-muted-foreground">
-                                {formatCurrency(
-                                  sectorBudget.current_period_spent || 0
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <span
-                                  className={
-                                    (sectorBudget?.current_period_budget || 0) -
-                                      (sectorBudget?.current_period_spent ||
-                                        0) >=
-                                    0
-                                      ? "text-green-600 font-medium"
-                                      : "text-red-600 font-medium"
-                                  }
-                                >
-                                  {formatCurrency(
-                                    Math.abs(
-                                      (sectorBudget?.current_period_budget ||
-                                        0) -
-                                        (sectorBudget?.current_period_spent ||
-                                          0)
-                                    )
-                                  )}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <div className="flex items-center justify-end space-x-2">
-                                  <div
-                                    className={`w-16 rounded-full h-2 ${
-                                      (sectorBudget?.current_period_budget ||
-                                        0) === 0
-                                        ? "bg-gray-600"
-                                        : "bg-gray-200"
-                                    }`}
+                      return {
+                        sector,
+                        sectorBudget,
+                        sectorCategories,
+                        sectorBudgets,
+                        sectorPercentage,
+                      };
+                    })
+                    .sort((a, b) => {
+                      // First sort by whether sector has a defined budget
+                      const aHasBudget = !!a.sectorBudget?.budget_id;
+                      const bHasBudget = !!b.sectorBudget?.budget_id;
+
+                      if (aHasBudget && !bHasBudget) return -1; // a has budget, b doesn't
+                      if (!aHasBudget && bHasBudget) return 1; // b has budget, a doesn't
+
+                      // If both have the same budget status, sort by percentage used
+                      return b.sectorPercentage - a.sectorPercentage;
+                    })
+                    .map(
+                      ({
+                        sector,
+                        sectorBudget,
+                        sectorCategories,
+                        sectorBudgets,
+                      }) => {
+                        const isExpanded = expandedSectors.has(sector.id);
+
+                        return (
+                          <React.Fragment key={sector.id}>
+                            {/* Sector Row */}
+                            <tr className="bg-muted/30 hover:bg-muted/50">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() =>
+                                      toggleSectorExpansion(sector.id)
+                                    }
+                                    className="p-1 hover:bg-muted rounded"
                                   >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-semibold">
+                                    {sector.name}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ({sectorCategories.length} categories)
+                                  </span>
+                                  {getSectorsWithoutYearlyBudgets(
+                                    sectors,
+                                    yearlyBudgetSummaries,
+                                    yearlySectorBudgetSummaries
+                                  ).some((s) => s.id === sector.id) && (
                                     <div
-                                      className={`h-2 rounded-full ${
-                                        (sectorBudget?.current_period_spent ||
-                                          0) /
-                                          Math.max(
-                                            sectorBudget?.current_period_budget ||
-                                              1,
-                                            1
-                                          ) >
-                                        1
-                                          ? "bg-red-500"
-                                          : (sectorBudget?.current_period_spent ||
+                                      onMouseEnter={(e) =>
+                                        showTooltip(
+                                          "Sector has categories with yearly budgets but no yearly sector budget",
+                                          e
+                                        )
+                                      }
+                                      onMouseLeave={hideTooltip}
+                                      onTouchStart={(e) =>
+                                        showTooltip(
+                                          "Sector has categories with yearly budgets but no yearly sector budget",
+                                          e
+                                        )
+                                      }
+                                    >
+                                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {sectorBudget?.budget_id ? (
+                                <>
+                                  <td className="py-3 px-4 text-right font-medium">
+                                    {formatCurrency(
+                                      sectorBudget.current_period_budget || 0
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 text-right text-muted-foreground">
+                                    {formatCurrency(
+                                      sectorBudget.current_period_spent || 0
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span
+                                      className={
+                                        (sectorBudget?.current_period_budget ||
+                                          0) -
+                                          (sectorBudget?.current_period_spent ||
+                                            0) >=
+                                        0
+                                          ? "text-green-600 font-medium"
+                                          : "text-red-600 font-medium"
+                                      }
+                                    >
+                                      {formatCurrency(
+                                        Math.abs(
+                                          (sectorBudget?.current_period_budget ||
+                                            0) -
+                                            (sectorBudget?.current_period_spent ||
+                                              0)
+                                        )
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <div className="flex items-center justify-end space-x-2">
+                                      <div
+                                        className={`w-16 rounded-full h-2 ${
+                                          (sectorBudget?.current_period_budget ||
+                                            0) === 0
+                                            ? "bg-gray-600"
+                                            : "bg-gray-200"
+                                        }`}
+                                      >
+                                        <div
+                                          className={`h-2 rounded-full ${
+                                            (sectorBudget?.current_period_spent ||
                                               0) /
                                               Math.max(
                                                 sectorBudget?.current_period_budget ||
                                                   1,
                                                 1
-                                              ) >=
-                                            0.9
-                                          ? "bg-yellow-500"
-                                          : "bg-green-500"
-                                      }`}
-                                      style={{
-                                        width: `${Math.min(
+                                              ) >
+                                            1
+                                              ? "bg-red-500"
+                                              : (sectorBudget?.current_period_spent ||
+                                                  0) /
+                                                  Math.max(
+                                                    sectorBudget?.current_period_budget ||
+                                                      1,
+                                                    1
+                                                  ) >=
+                                                0.9
+                                              ? "bg-yellow-500"
+                                              : "bg-green-500"
+                                          }`}
+                                          style={{
+                                            width: `${Math.min(
+                                              ((sectorBudget?.current_period_spent ||
+                                                0) /
+                                                Math.max(
+                                                  sectorBudget?.current_period_budget ||
+                                                    1,
+                                                  1
+                                                )) *
+                                                100,
+                                              100
+                                            )}%`,
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-sm">
+                                        {(
                                           ((sectorBudget?.current_period_spent ||
                                             0) /
                                             Math.max(
@@ -502,309 +655,323 @@ export function YearlyBudgetDisplay({
                                                 1,
                                               1
                                             )) *
-                                            100,
                                           100
-                                        )}%`,
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="text-sm">
-                                    {(
-                                      ((sectorBudget?.current_period_spent ||
-                                        0) /
-                                        Math.max(
-                                          sectorBudget?.current_period_budget ||
-                                            1,
-                                          1
-                                        )) *
-                                      100
-                                    ).toFixed(1)}
-                                    %
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="text-center py-3 px-4">
-                                <div className="flex justify-center">
-                                  {sectorBudget?.auto_rollup ? (
-                                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                                      <svg
-                                        className="w-3 h-3 text-green-600"
-                                        fill="currentColor"
-                                        viewBox="0 0 20 20"
-                                      >
-                                        <path
-                                          fillRule="evenodd"
-                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                          clipRule="evenodd"
-                                        />
-                                      </svg>
-                                    </div>
-                                  ) : (
-                                    <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
-                                      <span className="text-xs font-semibold text-blue-600">
-                                        M
+                                        ).toFixed(1)}
+                                        %
                                       </span>
                                     </div>
+                                  </td>
+                                  <td className="text-center py-3 px-4">
+                                    <div className="flex justify-center">
+                                      {sectorBudget?.auto_rollup ? (
+                                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                                          <svg
+                                            className="w-3 h-3 text-green-600"
+                                            fill="currentColor"
+                                            viewBox="0 0 20 20"
+                                          >
+                                            <path
+                                              fillRule="evenodd"
+                                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                              clipRule="evenodd"
+                                            />
+                                          </svg>
+                                        </div>
+                                      ) : (
+                                        <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                                          <span className="text-xs font-semibold text-blue-600">
+                                            M
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="py-3 px-4 text-right text-muted-foreground">
+                                    —
+                                  </td>
+                                  <td className="py-3 px-4 text-right text-muted-foreground">
+                                    —
+                                  </td>
+                                  <td className="py-3 px-4 text-right text-muted-foreground">
+                                    —
+                                  </td>
+                                  <td className="py-3 px-4 text-center text-muted-foreground">
+                                    —
+                                  </td>
+                                  <td className="py-3 px-4 text-center text-muted-foreground">
+                                    —
+                                  </td>
+                                </>
+                              )}
+                              <td className="py-3 px-4 text-center">
+                                <div className="flex gap-2 justify-center">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openSectorModal(sector)}
+                                    className="h-8 px-3"
+                                    title="View transactions for this sector"
+                                  >
+                                    <HelpCircle className="h-3 w-3" />
+                                  </Button>
+                                  {sectorBudget?.budget_id ? (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          onEditYearlySectorBudget(sectorBudget)
+                                        }
+                                        className="h-8 px-3"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          onDeleteYearlySectorBudget(sector.id)
+                                        }
+                                        className="h-8 px-3 text-red-500 hover:text-red-400"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        onCreateYearlySectorBudget(sector)
+                                      }
+                                      className="h-8 px-3"
+                                    >
+                                      <Plus className="h-3 w-3 mr-1" />
+                                      Create
+                                    </Button>
                                   )}
                                 </div>
                               </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="py-3 px-4 text-right text-muted-foreground">
-                                —
-                              </td>
-                              <td className="py-3 px-4 text-right text-muted-foreground">
-                                —
-                              </td>
-                              <td className="py-3 px-4 text-right text-muted-foreground">
-                                —
-                              </td>
-                              <td className="py-3 px-4 text-center text-muted-foreground">
-                                —
-                              </td>
-                              <td className="py-3 px-4 text-center text-muted-foreground">
-                                —
-                              </td>
-                            </>
-                          )}
-                          <td className="py-3 px-4 text-center">
-                            <div className="flex gap-2 justify-center">
-                              {sectorBudget?.budget_id ? (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      onEditYearlySectorBudget(sectorBudget)
-                                    }
-                                    className="h-8 px-3"
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      onDeleteYearlySectorBudget(sector.id)
-                                    }
-                                    className="h-8 px-3 text-red-500 hover:text-red-400"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    onCreateYearlySectorBudget(sector)
-                                  }
-                                  className="h-8 px-3"
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Create
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                            </tr>
 
-                        {/* Category Rows (when expanded) */}
-                        {isExpanded && (
-                          <>
-                            {sectorBudgets.length > 0
-                              ? sectorBudgets
-                                  .map((budget) => {
-                                    const totalBudget =
-                                      budget.budget_type === "absolute"
-                                        ? budget.absolute_amount || 0
-                                        : (budget.user1_amount || 0) +
-                                          (budget.user2_amount || 0);
-                                    const spent =
-                                      budget.current_period_spent || 0;
-                                    const overUnder = totalBudget - spent;
-                                    const percentage =
-                                      totalBudget > 0
-                                        ? (spent / totalBudget) * 100
-                                        : 0;
+                            {/* Category Rows (when expanded) */}
+                            {isExpanded && (
+                              <>
+                                {sectorBudgets.length > 0
+                                  ? sectorBudgets
+                                      .map((budget) => {
+                                        const totalBudget =
+                                          budget.budget_type === "absolute"
+                                            ? budget.absolute_amount || 0
+                                            : (budget.user1_amount || 0) +
+                                              (budget.user2_amount || 0);
+                                        const spent =
+                                          budget.current_period_spent || 0;
+                                        const overUnder = totalBudget - spent;
+                                        const percentage =
+                                          totalBudget > 0
+                                            ? (spent / totalBudget) * 100
+                                            : 0;
 
-                                    return {
-                                      budget,
-                                      totalBudget,
-                                      spent,
-                                      overUnder,
-                                      percentage,
-                                    };
-                                  })
-                                  .sort((a, b) => b.percentage - a.percentage)
-                                  .map(
-                                    ({
-                                      budget,
-                                      totalBudget,
-                                      spent,
-                                      overUnder,
-                                      percentage,
-                                    }) => (
-                                      <tr
-                                        key={budget.category_id}
-                                        className="hover:bg-muted/20"
-                                      >
-                                        <td className="py-3 px-4">
-                                          <div className="flex items-center space-x-3 ml-8">
-                                            {(() => {
-                                              const category = categories.find(
-                                                (c) =>
-                                                  c.id === budget.category_id
-                                              );
-                                              return category?.image_url ? (
-                                                <img
-                                                  src={category.image_url}
-                                                  alt={category.name}
-                                                  className="w-6 h-6 rounded-full object-cover"
-                                                />
-                                              ) : (
-                                                <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                                                  <DollarSign className="h-3 w-3 text-muted-foreground" />
-                                                </div>
-                                              );
-                                            })()}
-                                            <span className="font-medium">
-                                              {(() => {
-                                                const category =
-                                                  categories.find(
-                                                    (c) =>
-                                                      c.id ===
-                                                      budget.category_id
+                                        return {
+                                          budget,
+                                          totalBudget,
+                                          spent,
+                                          overUnder,
+                                          percentage,
+                                        };
+                                      })
+                                      .sort(
+                                        (a, b) => b.percentage - a.percentage
+                                      )
+                                      .map(
+                                        ({
+                                          budget,
+                                          totalBudget,
+                                          spent,
+                                          overUnder,
+                                          percentage,
+                                        }) => (
+                                          <tr
+                                            key={budget.category_id}
+                                            className="hover:bg-muted/20"
+                                          >
+                                            <td className="py-3 px-4">
+                                              <div className="flex items-center space-x-3 ml-8">
+                                                {(() => {
+                                                  const category =
+                                                    categories.find(
+                                                      (c) =>
+                                                        c.id ===
+                                                        budget.category_id
+                                                    );
+                                                  return category?.image_url ? (
+                                                    <img
+                                                      src={category.image_url}
+                                                      alt={category.name}
+                                                      className="w-6 h-6 rounded-full object-cover"
+                                                    />
+                                                  ) : (
+                                                    <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                                                      <DollarSign className="h-3 w-3 text-muted-foreground" />
+                                                    </div>
                                                   );
-                                                return (
-                                                  category?.name ||
-                                                  "Unknown Category"
-                                                );
-                                              })()}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="py-3 px-4 text-right font-medium">
-                                          {formatCurrency(totalBudget)}
-                                        </td>
-                                        <td className="py-3 px-4 text-right">
-                                          {formatCurrency(spent)}
-                                        </td>
-                                        <td
-                                          className={`py-3 px-4 text-right font-medium ${
-                                            overUnder < 0
-                                              ? "text-red-600"
-                                              : "text-green-600"
-                                          }`}
-                                        >
-                                          {formatCurrency(Math.abs(overUnder))}
-                                        </td>
-                                        <td className="py-3 px-4 text-right">
-                                          <div className="flex items-center justify-end space-x-2">
-                                            <div
-                                              className={`w-16 rounded-full h-2 ${
-                                                percentage === 0
-                                                  ? "bg-gray-600"
-                                                  : "bg-gray-200"
+                                                })()}
+                                                <span className="font-medium">
+                                                  {(() => {
+                                                    const category =
+                                                      categories.find(
+                                                        (c) =>
+                                                          c.id ===
+                                                          budget.category_id
+                                                      );
+                                                    return (
+                                                      category?.name ||
+                                                      "Unknown Category"
+                                                    );
+                                                  })()}
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-right font-medium">
+                                              {formatCurrency(totalBudget)}
+                                            </td>
+                                            <td className="py-3 px-4 text-right">
+                                              {formatCurrency(spent)}
+                                            </td>
+                                            <td
+                                              className={`py-3 px-4 text-right font-medium ${
+                                                overUnder < 0
+                                                  ? "text-red-600"
+                                                  : "text-green-600"
                                               }`}
                                             >
-                                              <div
-                                                className={`h-2 rounded-full ${
-                                                  percentage > 100
-                                                    ? "bg-red-500"
-                                                    : percentage >= 90
-                                                    ? "bg-yellow-500"
-                                                    : "bg-green-500"
-                                                }`}
-                                                style={{
-                                                  width: `${Math.min(
-                                                    percentage,
-                                                    100
-                                                  )}%`,
-                                                }}
-                                              />
-                                            </div>
-                                            <span className="text-sm">
-                                              {percentage.toFixed(1)}%
-                                            </span>
+                                              {formatCurrency(
+                                                Math.abs(overUnder)
+                                              )}
+                                            </td>
+                                            <td className="py-3 px-4 text-right">
+                                              <div className="flex items-center justify-end space-x-2">
+                                                <div
+                                                  className={`w-16 rounded-full h-2 ${
+                                                    percentage === 0
+                                                      ? "bg-gray-600"
+                                                      : "bg-gray-200"
+                                                  }`}
+                                                >
+                                                  <div
+                                                    className={`h-2 rounded-full ${
+                                                      percentage > 100
+                                                        ? "bg-red-500"
+                                                        : percentage >= 90
+                                                        ? "bg-yellow-500"
+                                                        : "bg-green-500"
+                                                    }`}
+                                                    style={{
+                                                      width: `${Math.min(
+                                                        percentage,
+                                                        100
+                                                      )}%`,
+                                                    }}
+                                                  />
+                                                </div>
+                                                <span className="text-sm">
+                                                  {percentage.toFixed(1)}%
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                              —
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                              <div className="flex gap-2 justify-center">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() =>
+                                                    openCategoryModal(budget)
+                                                  }
+                                                  className="h-8 px-3"
+                                                  title="View transactions for this category"
+                                                >
+                                                  <HelpCircle className="h-3 w-3" />
+                                                </Button>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() =>
+                                                    onEditYearlyBudget(budget)
+                                                  }
+                                                  className="h-8 px-3"
+                                                >
+                                                  <Edit className="h-3 w-3" />
+                                                </Button>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() =>
+                                                    onDeleteYearlyBudget(
+                                                      budget.category_id
+                                                    )
+                                                  }
+                                                  className="h-8 px-3 text-red-500 hover:text-red-400"
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )
+                                      )
+                                  : null}
+
+                                {/* Special row for unset categories */}
+                                {(() => {
+                                  const categoriesWithBudgets = new Set(
+                                    sectorBudgets.map((b) => b.category_id)
+                                  );
+                                  const unsetCategories =
+                                    sectorCategories.filter(
+                                      (cat) =>
+                                        !categoriesWithBudgets.has(cat.id)
+                                    );
+
+                                  if (unsetCategories.length === 0) return null;
+
+                                  return (
+                                    <tr className="bg-muted/20 border-t">
+                                      <td colSpan={7} className="py-4 px-4">
+                                        <div className="flex justify-center">
+                                          <div className="flex flex-wrap justify-center gap-2">
+                                            {unsetCategories.map((category) => (
+                                              <Button
+                                                key={category.id}
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                  onCreateYearlyBudget(category)
+                                                }
+                                                className="text-xs h-7 px-3"
+                                              >
+                                                <Plus className="h-3 w-3 mr-1" />
+                                                {category.name}
+                                              </Button>
+                                            ))}
                                           </div>
-                                        </td>
-                                        <td className="py-3 px-4 text-center">
-                                          —
-                                        </td>
-                                        <td className="py-3 px-4 text-center">
-                                          <div className="flex gap-2 justify-center">
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() =>
-                                                onEditYearlyBudget(budget)
-                                              }
-                                              className="h-8 px-3"
-                                            >
-                                              <Edit className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() =>
-                                                onDeleteYearlyBudget(
-                                                  budget.category_id
-                                                )
-                                              }
-                                              className="h-8 px-3 text-red-500 hover:text-red-400"
-                                            >
-                                              <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    )
-                                  )
-                              : null}
-
-                            {/* Special row for unset categories */}
-                            {(() => {
-                              const categoriesWithBudgets = new Set(
-                                sectorBudgets.map((b) => b.category_id)
-                              );
-                              const unsetCategories = sectorCategories.filter(
-                                (cat) => !categoriesWithBudgets.has(cat.id)
-                              );
-
-                              if (unsetCategories.length === 0) return null;
-
-                              return (
-                                <tr className="bg-muted/20 border-t">
-                                  <td colSpan={7} className="py-4 px-4">
-                                    <div className="flex justify-center">
-                                      <div className="flex flex-wrap justify-center gap-2">
-                                        {unsetCategories.map((category) => (
-                                          <Button
-                                            key={category.id}
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                              onCreateYearlyBudget(category)
-                                            }
-                                            className="text-xs h-7 px-3"
-                                          >
-                                            <Plus className="h-3 w-3 mr-1" />
-                                            {category.name}
-                                          </Button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })()}
-                          </>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+                              </>
+                            )}
+                          </React.Fragment>
+                        );
+                      }
+                    )}
                 </tbody>
               </table>
             </div>
@@ -1283,6 +1450,34 @@ export function YearlyBudgetDisplay({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Modal */}
+      {modalData && (
+        <YearlyBudgetModal
+          modalData={modalData}
+          onClose={() => setModalData(null)}
+          selectedYear={selectedYear}
+          selectedMonthForProgress={selectedMonthForProgress}
+          user1AvatarUrl={user1AvatarUrl}
+          user2AvatarUrl={user2AvatarUrl}
+          onEditBudget={onEditYearlyBudget}
+          onDeleteBudget={onDeleteYearlyBudget}
+          onEditSectorBudget={onEditYearlySectorBudget}
+          onDeleteSectorBudget={onDeleteYearlySectorBudget}
+          onCreateSectorBudget={onCreateYearlySectorBudget}
+          userNames={userNames}
+          deleteTransaction={deleteTransaction}
+          handleSetEditingTransaction={handleSetEditingTransaction}
+          onToggleExclude={onToggleExclude}
+          allTransactions={allTransactions}
+          incomeImageUrl={incomeImageUrl}
+          settlementImageUrl={settlementImageUrl}
+          reimbursementImageUrl={reimbursementImageUrl}
+          budgetSummaries={yearlyBudgetSummaries}
+          sectors={sectors}
+          categories={categories}
+        />
       )}
     </div>
   );

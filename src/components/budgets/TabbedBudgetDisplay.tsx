@@ -66,6 +66,7 @@ interface TabbedBudgetDisplayProps {
   ) => Promise<void>;
   onCreateYearlyBudget: (category: Category) => void;
   onCreateYearlySectorBudget: (sector: Sector) => void;
+  onOpenCategoryModal: (budgetSummary: YearlyBudgetSummary) => void;
 }
 
 export function TabbedBudgetDisplay({
@@ -110,6 +111,7 @@ export function TabbedBudgetDisplay({
   onDeleteYearlySectorBudgetDirect,
   onCreateYearlyBudget,
   onCreateYearlySectorBudget,
+  onOpenCategoryModal,
 }: TabbedBudgetDisplayProps) {
   // Use external state if provided, otherwise use internal state
   const [internalActiveTab, setInternalActiveTab] = useState("monthly");
@@ -219,6 +221,7 @@ export function TabbedBudgetDisplay({
             onDeleteYearlySectorBudgetDirect={onDeleteYearlySectorBudgetDirect}
             onCreateYearlyBudget={onCreateYearlyBudget}
             onCreateYearlySectorBudget={onCreateYearlySectorBudget}
+            onOpenCategoryModal={onOpenCategoryModal}
             userNames={userNames}
             deleteTransaction={deleteTransaction}
             handleSetEditingTransaction={handleSetEditingTransaction}
