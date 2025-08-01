@@ -38,6 +38,8 @@ import {
 import { BudgetStats } from "./BudgetStats";
 import { Badge } from "@/components/ui/badge";
 import { SectorBudgetCard } from "./SectorBudgetCard";
+import { YearlySectorBudgetCard } from "./YearlySectorBudgetCard";
+import { YearlyCategoryBudgetCard } from "./YearlyCategoryBudgetCard";
 
 interface YearlyBudgetDisplayProps {
   sectors: Sector[];
@@ -812,405 +814,36 @@ export function YearlyBudgetDisplay({
             }
 
             return (
-              <Card key={sector.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold text-foreground">
-                      {sector.name}
-                    </CardTitle>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          toggleSectorExpansion(sector.id);
-                        }}
-                        className="h-8 w-8"
-                      >
-                        {expandedSectors.has(sector.id) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEditYearlySectorBudget(sectorBudget)}
-                        className="h-8 w-8"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDeleteYearlySectorBudget(sector.id)}
-                        className="h-8 w-8"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary">
-                      {sectorBudget.budget_type === "absolute"
-                        ? "Absolute"
-                        : "Split"}
-                    </Badge>
-                    {sectorBudget.auto_rollup ? (
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-500/20 text-green-600"
-                      >
-                        Auto Rollup
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-500/20 text-blue-600"
-                      >
-                        Manual
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Progress Bar */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {selectedYear} (through{" "}
-                        {getMonthName(selectedMonthForProgress)}):
-                      </span>
-                      <span className="font-medium">
-                        {formatCurrency(sectorBudget.current_period_spent || 0)}{" "}
-                        /{" "}
-                        {formatCurrency(
-                          sectorBudget.current_period_budget || 0
-                        )}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div
-                        className={`h-2.5 rounded-full transition-all duration-300 ${
-                          (sectorBudget.current_period_spent || 0) >
-                          (sectorBudget.current_period_budget || 0)
-                            ? "bg-red-500"
-                            : (sectorBudget.current_period_spent || 0) >=
-                              (sectorBudget.current_period_budget || 0) * 0.8
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                        }`}
-                        style={{
-                          width: `${Math.min(
-                            ((sectorBudget.current_period_spent || 0) /
-                              (sectorBudget.current_period_budget || 1)) *
-                              100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        {(
-                          ((sectorBudget.current_period_spent || 0) /
-                            (sectorBudget.current_period_budget || 1)) *
-                          100
-                        ).toFixed(1)}
-                        % used
-                      </span>
-                      <span
-                        className={
-                          (sectorBudget.current_period_budget || 0) -
-                            (sectorBudget.current_period_spent || 0) >=
-                          0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }
-                      >
-                        {formatCurrency(
-                          Math.abs(
-                            (sectorBudget.current_period_budget || 0) -
-                              (sectorBudget.current_period_spent || 0)
-                          )
-                        )}{" "}
-                        {(sectorBudget.current_period_budget || 0) -
-                          (sectorBudget.current_period_spent || 0) >=
-                        0
-                          ? "under"
-                          : "over"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Budget Details */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Total Budget</p>
-                      <p className="font-medium">
-                        {formatCurrency(
-                          sectorBudget.current_period_budget || 0
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Spent</p>
-                      <p className="text-muted-foreground">
-                        {formatCurrency(sectorBudget.current_period_spent || 0)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* User Spending Breakdown for Split Budgets */}
-                  {sectorBudget.budget_type === "split" && (
-                    <div className="text-xs text-muted-foreground space-y-1 pt-2">
-                      <div className="flex justify-between items-center">
-                        <span>
-                          {userNames[0]}:{" "}
-                          {formatCurrency(
-                            sectorBudget.current_period_user1_spent || 0
-                          )}
-                          {` / ${formatCurrency(
-                            sectorBudget.user1_amount || 0
-                          )}`}
-                        </span>
-                        <span>
-                          {userNames[1]}:{" "}
-                          {formatCurrency(
-                            sectorBudget.current_period_user2_spent || 0
-                          )}
-                          {` / ${formatCurrency(
-                            sectorBudget.user2_amount || 0
-                          )}`}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Expandable Category Budgets */}
-                  {expandedSectors.has(sector.id) && (
-                    <div className="space-y-3 pt-4 border-t border-muted">
-                      {/* Categories with existing budgets */}
-                      {yearlyBudgetSummaries
-                        .filter((budget) => {
-                          // Check if this category belongs to the current sector
-                          return (
-                            sector.category_ids &&
-                            sector.category_ids.includes(budget.category_id)
-                          );
-                        })
-                        .map((budget) => {
-                          const category = categories.find(
-                            (c) => c.id === budget.category_id
-                          );
-                          const totalBudget =
-                            budget.budget_type === "absolute"
-                              ? budget.absolute_amount || 0
-                              : (budget.user1_amount || 0) +
-                                (budget.user2_amount || 0);
-                          const spent = budget.current_period_spent || 0;
-                          const remaining = totalBudget - spent;
-                          const percentageUsed =
-                            totalBudget > 0 ? (spent / totalBudget) * 100 : 0;
-
-                          return (
-                            <div
-                              key={budget.category_id}
-                              className="ml-4 border-l-4 border-primary/30 bg-card/50 rounded-lg p-4 shadow-sm"
-                            >
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center space-x-3">
-                                  {category?.image_url ? (
-                                    <img
-                                      src={category.image_url}
-                                      alt={category.name}
-                                      className="w-6 h-6 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                                      <DollarSign className="h-3 w-3 text-muted-foreground" />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <h4 className="font-medium text-sm">
-                                      {category?.name}
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground">
-                                      {budget.budget_type === "absolute"
-                                        ? "Absolute"
-                                        : "Split"}{" "}
-                                      Budget
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onEditYearlyBudget(budget)}
-                                    className="h-6 w-6"
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      onDeleteYearlyBudget(budget.category_id)
-                                    }
-                                    className="h-6 w-6"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* Progress Bar */}
-                              <div className="space-y-2 mb-3">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">
-                                    {selectedYear} (through{" "}
-                                    {getMonthName(selectedMonthForProgress)}):
-                                  </span>
-                                  <span className="font-medium">
-                                    {formatCurrency(spent)} /{" "}
-                                    {formatCurrency(totalBudget)}
-                                  </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full transition-all duration-300 ${
-                                      percentageUsed > 100
-                                        ? "bg-red-500"
-                                        : percentageUsed >= 80
-                                        ? "bg-yellow-500"
-                                        : "bg-green-500"
-                                    }`}
-                                    style={{
-                                      width: `${Math.min(
-                                        percentageUsed,
-                                        100
-                                      )}%`,
-                                    }}
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-muted-foreground">
-                                    {percentageUsed.toFixed(1)}% used
-                                  </span>
-                                  <span
-                                    className={
-                                      remaining >= 0
-                                        ? "text-green-600"
-                                        : "text-red-600"
-                                    }
-                                  >
-                                    {formatCurrency(Math.abs(remaining))}{" "}
-                                    {remaining >= 0 ? "under" : "over"}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Budget Details */}
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <p className="text-muted-foreground">
-                                    Budget
-                                  </p>
-                                  <p className="font-medium">
-                                    {formatCurrency(totalBudget)}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground">Spent</p>
-                                  <p className="text-muted-foreground">
-                                    {formatCurrency(spent)}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* User Spending for Split Budgets */}
-                              {budget.budget_type === "split" && (
-                                <div className="text-xs text-muted-foreground space-y-1 pt-2">
-                                  <div className="flex justify-between items-center">
-                                    <span>
-                                      {userNames[0]}:{" "}
-                                      {formatCurrency(
-                                        budget.current_period_user1_spent || 0
-                                      )}
-                                      {` / ${formatCurrency(
-                                        budget.user1_amount || 0
-                                      )}`}
-                                    </span>
-                                    <span>
-                                      {userNames[1]}:{" "}
-                                      {formatCurrency(
-                                        budget.current_period_user2_spent || 0
-                                      )}
-                                      {` / ${formatCurrency(
-                                        budget.user2_amount || 0
-                                      )}`}
-                                    </span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                      {/* Categories without budgets */}
-                      {(() => {
-                        // Get all categories that belong to this sector
-                        const sectorCategories = categories.filter((cat) =>
-                          sector.category_ids.includes(cat.id)
-                        );
-
-                        // Get categories that have yearly budgets
-                        const categoriesWithBudgets = yearlyBudgetSummaries
-                          .filter((budget) =>
-                            sector.category_ids.includes(budget.category_id)
-                          )
-                          .map((budget) => budget.category_id);
-
-                        // Find categories without yearly budgets
-                        const categoriesWithoutBudgets =
-                          sectorCategories.filter(
-                            (cat) => !categoriesWithBudgets.includes(cat.id)
-                          );
-
-                        if (categoriesWithoutBudgets.length === 0) return null;
-
-                        return (
-                          <div className="space-y-2 pt-3 border-t border-muted/30">
-                            <div className="text-xs text-muted-foreground font-medium">
-                              Categories without yearly budgets:
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {categoriesWithoutBudgets.map((category) => (
-                                <Button
-                                  key={category.id}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    onEditYearlyBudget({
-                                      category_id: category.id,
-                                    } as any)
-                                  }
-                                  className="h-7 px-3 text-xs"
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  {category.name}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <YearlySectorBudgetCard
+                key={sector.id}
+                sectorBudgetSummary={sectorBudget}
+                onEdit={onEditYearlySectorBudget}
+                onDelete={onDeleteYearlySectorBudget}
+                selectedYear={selectedYear}
+                selectedMonthForProgress={selectedMonthForProgress}
+                user1AvatarUrl={user1AvatarUrl}
+                user2AvatarUrl={user2AvatarUrl}
+                budgetSummaries={yearlyBudgetSummaries}
+                sectors={sectors}
+                isExpanded={expandedSectors.has(sector.id)}
+                onToggleExpansion={() => toggleSectorExpansion(sector.id)}
+                categories={categories}
+                onEditBudget={onEditYearlyBudget}
+                onDeleteBudget={onDeleteYearlyBudget}
+                userNames={{ user1: userNames[0], user2: userNames[1] }}
+                getMonthName={getMonthName}
+                formatCurrency={(amount: number | null | undefined) => {
+                  if (amount === null || amount === undefined) return "$0.00";
+                  return formatCurrency(amount);
+                }}
+                allTransactions={allTransactions}
+                deleteTransaction={deleteTransaction}
+                handleSetEditingTransaction={handleSetEditingTransaction}
+                onToggleExclude={onToggleExclude}
+                incomeImageUrl={incomeImageUrl}
+                settlementImageUrl={settlementImageUrl}
+                reimbursementImageUrl={reimbursementImageUrl}
+              />
             );
           })}
       </div>

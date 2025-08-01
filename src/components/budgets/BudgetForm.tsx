@@ -64,6 +64,13 @@ export function BudgetForm({
     user2_amount: undefined,
   });
 
+  // String values for input fields to improve UX
+  const [inputValues, setInputValues] = useState({
+    absolute_amount: "",
+    user1_amount: "",
+    user2_amount: "",
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userNames, setUserNames] = useState({
@@ -104,8 +111,21 @@ export function BudgetForm({
         user1_amount: existingBudget.user1_amount,
         user2_amount: existingBudget.user2_amount,
       });
+      // Set input values to display the actual values
+      setInputValues({
+        absolute_amount: existingBudget.absolute_amount?.toString() ?? "",
+        user1_amount: existingBudget.user1_amount?.toString() ?? "",
+        user2_amount: existingBudget.user2_amount?.toString() ?? "",
+      });
     }
   }, [existingBudget]);
+
+  // Helper function to parse number input
+  const parseNumberInput = (value: string): number | undefined => {
+    if (value === "") return undefined;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,6 +383,12 @@ export function BudgetForm({
                     user1_amount: undefined,
                     user2_amount: undefined,
                   }));
+                  // Reset input values when switching budget types
+                  setInputValues({
+                    absolute_amount: "",
+                    user1_amount: "",
+                    user2_amount: "",
+                  });
                 }
               }}
               className="w-full"
@@ -386,20 +412,18 @@ export function BudgetForm({
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                value={
-                  formData.absolute_amount !== undefined
-                    ? formData.absolute_amount
-                    : ""
-                }
-                onChange={(e) =>
+                value={inputValues.absolute_amount}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setInputValues((prev) => ({
+                    ...prev,
+                    absolute_amount: value,
+                  }));
                   setFormData((prev) => ({
                     ...prev,
-                    absolute_amount:
-                      e.target.value !== ""
-                        ? parseFloat(e.target.value)
-                        : undefined,
-                  }))
-                }
+                    absolute_amount: parseNumberInput(value),
+                  }));
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 Enter 0 to set a zero budget (no spending allowed)
@@ -415,20 +439,18 @@ export function BudgetForm({
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value={
-                    formData.user1_amount !== undefined
-                      ? formData.user1_amount
-                      : ""
-                  }
-                  onChange={(e) =>
+                  value={inputValues.user1_amount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setInputValues((prev) => ({
+                      ...prev,
+                      user1_amount: value,
+                    }));
                     setFormData((prev) => ({
                       ...prev,
-                      user1_amount:
-                        e.target.value !== ""
-                          ? parseFloat(e.target.value)
-                          : undefined,
-                    }))
-                  }
+                      user1_amount: parseNumberInput(value),
+                    }));
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -439,20 +461,18 @@ export function BudgetForm({
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value={
-                    formData.user2_amount !== undefined
-                      ? formData.user2_amount
-                      : ""
-                  }
-                  onChange={(e) =>
+                  value={inputValues.user2_amount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setInputValues((prev) => ({
+                      ...prev,
+                      user2_amount: value,
+                    }));
                     setFormData((prev) => ({
                       ...prev,
-                      user2_amount:
-                        e.target.value !== ""
-                          ? parseFloat(e.target.value)
-                          : undefined,
-                    }))
-                  }
+                      user2_amount: parseNumberInput(value),
+                    }));
+                  }}
                 />
               </div>
               {formData.user1_amount !== undefined &&

@@ -3,13 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Loader2 } from "lucide-react";
 import {
   Sector,
@@ -63,6 +57,14 @@ export function SectorBudgetForm({
       auto_rollup: true,
     };
   });
+
+  // String values for input fields to improve UX
+  const [inputValues, setInputValues] = useState({
+    absolute_amount: "",
+    user1_amount: "",
+    user2_amount: "",
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +79,12 @@ export function SectorBudgetForm({
         user2_amount: existingBudget.user2_amount ?? 0,
         auto_rollup: existingBudget.auto_rollup ?? true,
       });
+      // Set input values to display the actual values
+      setInputValues({
+        absolute_amount: existingBudget.absolute_amount?.toString() ?? "",
+        user1_amount: existingBudget.user1_amount?.toString() ?? "",
+        user2_amount: existingBudget.user2_amount?.toString() ?? "",
+      });
     } else {
       // Reset to default values for new budget
       setFormData({
@@ -87,8 +95,19 @@ export function SectorBudgetForm({
         user2_amount: 0,
         auto_rollup: true,
       });
+      setInputValues({
+        absolute_amount: "",
+        user1_amount: "",
+        user2_amount: "",
+      });
     }
   }, [existingBudget, sector.id]);
+
+  // Helper function to parse number input
+  const parseNumberInput = (value: string): number => {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,21 +347,30 @@ export function SectorBudgetForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="budget-type" className="text-white">
-          Budget Type
-        </Label>
-        <Select
+        <Label className="text-white">Budget Type</Label>
+        <ToggleGroup
+          type="single"
           value={formData.budget_type}
-          onValueChange={handleBudgetTypeChange}
+          onValueChange={(value) => {
+            if (value) {
+              handleBudgetTypeChange(value);
+              // Reset input values when switching budget types
+              setInputValues({
+                absolute_amount: "",
+                user1_amount: "",
+                user2_amount: "",
+              });
+            }
+          }}
+          className="w-full"
         >
-          <SelectTrigger className="bg-card border-border text-foreground">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="absolute">Absolute Amount</SelectItem>
-            <SelectItem value="split">Split Between Users</SelectItem>
-          </SelectContent>
-        </Select>
+          <ToggleGroupItem value="absolute" className="flex-1">
+            Absolute
+          </ToggleGroupItem>
+          <ToggleGroupItem value="split" className="flex-1">
+            Split
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {formData.budget_type === "absolute" ? (
@@ -355,19 +383,15 @@ export function SectorBudgetForm({
             type="number"
             step="0.01"
             min="0"
-            value={
-              formData.auto_rollup
-                ? ""
-                : formData.absolute_amount !== undefined
-                ? formData.absolute_amount
-                : ""
-            }
-            onChange={(e) =>
+            value={formData.auto_rollup ? "" : inputValues.absolute_amount}
+            onChange={(e) => {
+              const value = e.target.value;
+              setInputValues((prev) => ({ ...prev, absolute_amount: value }));
               setFormData((prev) => ({
                 ...prev,
-                absolute_amount: parseFloat(e.target.value) || 0,
-              }))
-            }
+                absolute_amount: parseNumberInput(value),
+              }));
+            }}
             disabled={formData.auto_rollup}
             className="bg-card border-border text-foreground"
             placeholder={
@@ -399,15 +423,15 @@ export function SectorBudgetForm({
               type="number"
               step="0.01"
               min="0"
-              value={
-                formData.user1_amount !== undefined ? formData.user1_amount : ""
-              }
-              onChange={(e) =>
+              value={inputValues.user1_amount}
+              onChange={(e) => {
+                const value = e.target.value;
+                setInputValues((prev) => ({ ...prev, user1_amount: value }));
                 setFormData((prev) => ({
                   ...prev,
-                  user1_amount: parseFloat(e.target.value) || 0,
-                }))
-              }
+                  user1_amount: parseNumberInput(value),
+                }));
+              }}
               className="bg-card border-border text-foreground"
               placeholder="0.00"
             />
@@ -424,15 +448,15 @@ export function SectorBudgetForm({
               type="number"
               step="0.01"
               min="0"
-              value={
-                formData.user2_amount !== undefined ? formData.user2_amount : ""
-              }
-              onChange={(e) =>
+              value={inputValues.user2_amount}
+              onChange={(e) => {
+                const value = e.target.value;
+                setInputValues((prev) => ({ ...prev, user2_amount: value }));
                 setFormData((prev) => ({
                   ...prev,
-                  user2_amount: parseFloat(e.target.value) || 0,
-                }))
-              }
+                  user2_amount: parseNumberInput(value),
+                }));
+              }}
               className="bg-card border-border text-foreground"
               placeholder="0.00"
             />
@@ -452,7 +476,7 @@ export function SectorBudgetForm({
             id="auto-rollup"
             checked={formData.auto_rollup}
             disabled={formData.budget_type === "split"}
-            onCheckedChange={(checked) =>
+            onCheckedChange={(checked) => {
               setFormData((prev) => ({
                 ...prev,
                 auto_rollup: checked,
@@ -461,8 +485,15 @@ export function SectorBudgetForm({
                 absolute_amount: checked
                   ? categoryBudgetsTotal
                   : prev.absolute_amount || 0,
-              }))
-            }
+              }));
+              // Update input value when auto-rollup changes
+              if (!checked) {
+                setInputValues((prev) => ({
+                  ...prev,
+                  absolute_amount: (formData.absolute_amount || 0).toString(),
+                }));
+              }
+            }}
           />
         </div>
         <p className="text-xs text-gray-300">
