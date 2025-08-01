@@ -40,7 +40,11 @@ interface CategoryBudgetCardProps {
   allTransactions?: Transaction[];
   deleteTransaction?: (id: string) => Promise<void>;
   handleSetEditingTransaction?: (transaction: any) => void;
-  onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
+  onToggleExclude?: (
+    transactionId: string,
+    excluded: boolean,
+    exclusionType: "monthly" | "yearly"
+  ) => Promise<void>;
   incomeImageUrl?: string | null;
   settlementImageUrl?: string | null;
   reimbursementImageUrl?: string | null;

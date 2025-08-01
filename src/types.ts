@@ -14,6 +14,7 @@ export interface Transaction {
   paid_to_user_name?: string | null;
   reimburses_transaction_id?: string | null;
   excluded_from_monthly_budget?: boolean;
+  excluded_from_yearly_budget?: boolean;
   // For client-side state
   is_new?: boolean;
 }

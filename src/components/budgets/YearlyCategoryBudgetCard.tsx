@@ -45,7 +45,11 @@ interface YearlyCategoryBudgetCardProps {
   allTransactions?: Transaction[];
   deleteTransaction?: (id: string) => Promise<void>;
   handleSetEditingTransaction?: (transaction: any) => void;
-  onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
+  onToggleExclude?: (
+    transactionId: string,
+    excluded: boolean,
+    exclusionType: "monthly" | "yearly"
+  ) => Promise<void>;
   incomeImageUrl?: string | null;
   settlementImageUrl?: string | null;
   reimbursementImageUrl?: string | null;
@@ -177,7 +181,7 @@ export function YearlyCategoryBudgetCard({
       // Filter transactions for this category and selected year, excluding excluded transactions
       const filtered = allTransactions.filter((transaction) => {
         // Exclude transactions that are marked as excluded from monthly budget
-        if (transaction.excluded_from_monthly_budget) {
+        if (transaction.excluded_from_yearly_budget) {
           return false;
         }
 

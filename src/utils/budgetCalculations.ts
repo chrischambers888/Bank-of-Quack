@@ -277,7 +277,7 @@ export const calculateYearlyCategorySpent = (
       return (
         t.category_id === categoryId &&
         t.transaction_type === "expense" &&
-        !t.excluded_from_monthly_budget &&
+        !t.excluded_from_yearly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );
@@ -308,7 +308,7 @@ export const calculateYearlyCategoryUser1Spent = (
       return (
         t.category_id === categoryId &&
         t.transaction_type === "expense" &&
-        !t.excluded_from_monthly_budget &&
+        !t.excluded_from_yearly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );
@@ -347,7 +347,7 @@ export const calculateYearlyCategoryUser2Spent = (
       return (
         t.category_id === categoryId &&
         t.transaction_type === "expense" &&
-        !t.excluded_from_monthly_budget &&
+        !t.excluded_from_yearly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );
@@ -386,7 +386,7 @@ export const calculateYearlySectorSpent = (
       return (
         sectorCategoryIds.includes(t.category_id!) &&
         t.transaction_type === "expense" &&
-        !t.excluded_from_monthly_budget &&
+        !t.excluded_from_yearly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );
@@ -417,7 +417,7 @@ export const calculateYearlySectorUser1Spent = (
       return (
         sectorCategoryIds.includes(t.category_id!) &&
         t.transaction_type === "expense" &&
-        !t.excluded_from_monthly_budget &&
+        !t.excluded_from_yearly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );
@@ -456,7 +456,7 @@ export const calculateYearlySectorUser2Spent = (
       return (
         sectorCategoryIds.includes(t.category_id!) &&
         t.transaction_type === "expense" &&
-        !t.excluded_from_monthly_budget &&
+        !t.excluded_from_yearly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );

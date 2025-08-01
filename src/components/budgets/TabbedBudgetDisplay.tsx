@@ -35,7 +35,11 @@ interface TabbedBudgetDisplayProps {
   userNames: string[];
   deleteTransaction: (id: string) => Promise<void>;
   handleSetEditingTransaction: (transaction: any) => void;
-  onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
+  onToggleExclude?: (
+    transactionId: string,
+    excluded: boolean,
+    exclusionType: "monthly" | "yearly"
+  ) => Promise<void>;
   onTabChange?: (tab: string) => void;
   allTransactions?: Transaction[];
   incomeImageUrl?: string | null;

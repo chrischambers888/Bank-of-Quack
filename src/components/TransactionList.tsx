@@ -34,7 +34,11 @@ interface TransactionListProps {
   categories: Category[];
   hideIncome?: boolean;
   showExcludeOption?: boolean;
-  onToggleExclude?: (transactionId: string, excluded: boolean) => void;
+  onToggleExclude?: (
+    transactionId: string,
+    excluded: boolean,
+    exclusionType: "monthly" | "yearly"
+  ) => void;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
@@ -293,7 +297,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             e.stopPropagation();
                             onToggleExclude(
                               t.id,
-                              !t.excluded_from_monthly_budget
+                              !t.excluded_from_monthly_budget,
+                              "monthly"
                             );
                           }}
                           className={`h-6 w-6 p-0 ${
