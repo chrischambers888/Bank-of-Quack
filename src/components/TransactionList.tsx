@@ -34,6 +34,7 @@ interface TransactionListProps {
   categories: Category[];
   hideIncome?: boolean;
   showExcludeOption?: boolean;
+  exclusionType?: "monthly" | "yearly";
   onToggleExclude?: (
     transactionId: string,
     excluded: boolean,
@@ -56,6 +57,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   categories,
   hideIncome = false,
   showExcludeOption = false,
+  exclusionType = "monthly",
   onToggleExclude,
 }) => {
   const navigate = useNavigate();
@@ -192,7 +194,13 @@ const TransactionList: React.FC<TransactionListProps> = ({
                       ? "border-gray-700 hover:bg-white/5"
                       : "border-border"
                   } ${isExpanded ? "ring-2 ring-primary/30" : ""} ${
-                    t.excluded_from_monthly_budget ? "opacity-60" : ""
+                    (
+                      exclusionType === "monthly"
+                        ? t.excluded_from_monthly_budget
+                        : t.excluded_from_yearly_budget
+                    )
+                      ? "opacity-60"
+                      : ""
                   } flex flex-col overflow-hidden animate-fade-in user-select-none focus:outline-none`}
                   onClick={() => {
                     window.getSelection()?.removeAllRanges();
@@ -297,8 +305,10 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             e.stopPropagation();
                             onToggleExclude(
                               t.id,
-                              !t.excluded_from_monthly_budget,
-                              "monthly"
+                              !(exclusionType === "monthly"
+                                ? t.excluded_from_monthly_budget
+                                : t.excluded_from_yearly_budget),
+                              exclusionType
                             );
                           }}
                           className={`h-6 w-6 p-0 ${
@@ -307,7 +317,11 @@ const TransactionList: React.FC<TransactionListProps> = ({
                               : "hover:bg-muted"
                           }`}
                         >
-                          {t.excluded_from_monthly_budget ? (
+                          {(
+                            exclusionType === "monthly"
+                              ? t.excluded_from_monthly_budget
+                              : t.excluded_from_yearly_budget
+                          ) ? (
                             <Eye className="h-4 w-4" />
                           ) : (
                             <EyeOff className="h-4 w-4" />

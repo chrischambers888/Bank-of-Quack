@@ -1765,7 +1765,7 @@ export function BudgetsPage() {
     return transactions.filter((t) => {
       const transactionDate = parseInputDateLocal(t.date);
       return (
-        (t.excluded_from_monthly_budget || t.excluded_from_yearly_budget) &&
+        t.excluded_from_monthly_budget &&
         transactionDate >= startDate &&
         transactionDate <= endDate
       );
@@ -2024,8 +2024,8 @@ export function BudgetsPage() {
               Excluded Transactions - {selectedMonthName}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              These transactions are excluded from budget calculations for this
-              month
+              These transactions are excluded from monthly budget calculations
+              for this month
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -2065,14 +2065,7 @@ export function BudgetsPage() {
                             </span>
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {transaction.excluded_from_monthly_budget &&
-                            transaction.excluded_from_yearly_budget
-                              ? "Excluded from monthly & yearly budgets"
-                              : transaction.excluded_from_monthly_budget
-                              ? "Excluded from monthly budget"
-                              : transaction.excluded_from_yearly_budget
-                              ? "Excluded from yearly budget"
-                              : null}
+                            Excluded from monthly budget
                           </span>
                         </div>
                       </div>
@@ -2094,40 +2087,20 @@ export function BudgetsPage() {
                             <ChevronDown className="h-4 w-4" />
                           )}
                         </Button>
-                        <div className="flex gap-1">
-                          {transaction.excluded_from_monthly_budget && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleToggleExclude(
-                                  transaction.id,
-                                  false,
-                                  "monthly"
-                                )
-                              }
-                              className="text-xs hidden md:inline-flex"
-                            >
-                              Include Monthly
-                            </Button>
-                          )}
-                          {transaction.excluded_from_yearly_budget && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleToggleExclude(
-                                  transaction.id,
-                                  false,
-                                  "yearly"
-                                )
-                              }
-                              className="text-xs hidden md:inline-flex"
-                            >
-                              Include Yearly
-                            </Button>
-                          )}
-                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleToggleExclude(
+                              transaction.id,
+                              false,
+                              "monthly"
+                            )
+                          }
+                          className="text-xs hidden md:inline-flex"
+                        >
+                          Include
+                        </Button>
                       </div>
                     </div>
                     {/* Mobile expanded section */}
@@ -2146,39 +2119,21 @@ export function BudgetsPage() {
                               {category.name}
                             </div>
                           )}
-                          <div className="pt-2 space-y-2">
-                            {transaction.excluded_from_monthly_budget && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleToggleExclude(
-                                    transaction.id,
-                                    false,
-                                    "monthly"
-                                  )
-                                }
-                                className="text-xs w-full"
-                              >
-                                Include from Monthly Budget
-                              </Button>
-                            )}
-                            {transaction.excluded_from_yearly_budget && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleToggleExclude(
-                                    transaction.id,
-                                    false,
-                                    "yearly"
-                                  )
-                                }
-                                className="text-xs w-full"
-                              >
-                                Include from Yearly Budget
-                              </Button>
-                            )}
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleToggleExclude(
+                                  transaction.id,
+                                  false,
+                                  "monthly"
+                                )
+                              }
+                              className="text-xs w-full"
+                            >
+                              Include
+                            </Button>
                           </div>
                         </div>
                       </div>

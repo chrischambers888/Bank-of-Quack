@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { EmptyStateCard } from "@/components/settings/EmptyStateCard";
 import {
   Category,
@@ -24,6 +30,8 @@ import {
   Circle,
   Trash2,
   PieChart,
+  EyeOff,
+  ChevronUp,
 } from "lucide-react";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import { supabase } from "@/supabaseClient";
@@ -222,6 +230,63 @@ export function YearlyBudgetDisplay({
       newExpanded.add(sectorId);
     }
     setExpandedSectors(newExpanded);
+  };
+
+  // State for excluded transactions
+  const [expandedExcludedTransactions, setExpandedExcludedTransactions] =
+    useState<Set<string>>(new Set());
+
+  // Get excluded transactions for the selected year
+  const getExcludedTransactions = () => {
+    const startDate = new Date(selectedYear, 0, 1); // January 1st of selected year
+    const endDate = new Date(selectedYear, 11, 31); // December 31st of selected year
+    endDate.setHours(23, 59, 59, 999);
+
+    return allTransactions.filter((t) => {
+      const transactionDate = new Date(t.date);
+      return (
+        t.excluded_from_yearly_budget &&
+        transactionDate >= startDate &&
+        transactionDate <= endDate
+      );
+    });
+  };
+
+  const excludedTransactions = getExcludedTransactions();
+
+  const toggleExpandedExcludedTransaction = (transactionId: string) => {
+    const newExpanded = new Set(expandedExcludedTransactions);
+    if (newExpanded.has(transactionId)) {
+      newExpanded.delete(transactionId);
+    } else {
+      newExpanded.add(transactionId);
+    }
+    setExpandedExcludedTransactions(newExpanded);
+  };
+
+  const getSplitTypeLabel = (splitType: string) => {
+    if (!userNames || userNames.length < 2) {
+      switch (splitType) {
+        case "splitEqually":
+          return "Split Equally";
+        case "user1_only":
+          return "For User 1 Only";
+        case "user2_only":
+          return "For User 2 Only";
+        default:
+          return splitType || "N/A";
+      }
+    }
+    switch (splitType) {
+      case "splitEqually":
+        return `Split Equally`;
+      case "user1_only":
+        return `For ${userNames[0]} Only`;
+      case "user2_only":
+        return `For ${userNames[1]} Only`;
+      default:
+        return splitType || "N/A";
+    }
   };
 
   // If no sectors exist, show a different empty state
@@ -1076,6 +1141,149 @@ export function YearlyBudgetDisplay({
           </div>
         );
       })()}
+
+      {/* Excluded Transactions Section */}
+      {excludedTransactions.length > 0 && (
+        <Card className="border border-white/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <EyeOff className="h-5 w-5 text-muted-foreground" />
+              Excluded Transactions - {selectedYear}
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              These transactions are excluded from yearly budget calculations
+              for {selectedYear}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {excludedTransactions.map((transaction) => {
+                const category = categories.find(
+                  (c) => c.id === transaction.category_id
+                );
+                const isExpanded = expandedExcludedTransactions.has(
+                  transaction.id
+                );
+                return (
+                  <div
+                    key={transaction.id}
+                    className="bg-card/50 rounded-lg border border-border overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {category?.image_url && (
+                          <img
+                            src={category.image_url}
+                            alt={category.name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium text-foreground">
+                            {transaction.description}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(transaction.date).toLocaleDateString()}
+                            <span className="hidden md:inline">
+                              {" "}
+                              •{" "}
+                              {getSplitTypeLabel(transaction.split_type || "")}
+                              {category && ` • ${category.name}`}
+                            </span>
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Excluded from yearly budget
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-red-500 font-medium">
+                          -${Math.abs(transaction.amount).toFixed(2)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            toggleExpandedExcludedTransaction(transaction.id)
+                          }
+                          className="md:hidden p-1"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            onToggleExclude?.(transaction.id, false, "yearly")
+                          }
+                          className="text-xs hidden md:inline-flex"
+                        >
+                          Include
+                        </Button>
+                      </div>
+                    </div>
+                    {/* Mobile expanded view */}
+                    <div className="md:hidden">
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-2 border-t border-border bg-muted/20">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                            <div>
+                              <strong>Type:</strong>{" "}
+                              {transaction.transaction_type}
+                            </div>
+                            {transaction.transaction_type === "expense" &&
+                              transaction.category_id && (
+                                <div>
+                                  <strong>Category:</strong>{" "}
+                                  {categories.find(
+                                    (c) => c.id === transaction.category_id
+                                  )?.name || "N/A"}
+                                </div>
+                              )}
+                            {transaction.transaction_type === "expense" && (
+                              <div>
+                                <strong>Paid By:</strong>{" "}
+                                {transaction.paid_by_user_name}
+                              </div>
+                            )}
+                            {transaction.transaction_type === "expense" &&
+                              transaction.split_type && (
+                                <div>
+                                  <strong>Split:</strong>{" "}
+                                  {getSplitTypeLabel(transaction.split_type)}
+                                </div>
+                              )}
+                          </div>
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                onToggleExclude?.(
+                                  transaction.id,
+                                  false,
+                                  "yearly"
+                                )
+                              }
+                              className="text-xs w-full"
+                            >
+                              Include
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

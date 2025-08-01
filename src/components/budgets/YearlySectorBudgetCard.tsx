@@ -61,6 +61,7 @@ interface YearlySectorBudgetCardProps {
   reimbursementImageUrl?: string | null;
   // Hide "?" button when rendered inside a modal
   hideTransactionsButton?: boolean;
+  exclusionType?: "monthly" | "yearly";
 }
 
 export function YearlySectorBudgetCard({
@@ -89,6 +90,7 @@ export function YearlySectorBudgetCard({
   settlementImageUrl,
   reimbursementImageUrl,
   hideTransactionsButton = false,
+  exclusionType = "yearly",
 }: YearlySectorBudgetCardProps) {
   const [showTransactions, setShowTransactions] = useState(false);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
@@ -174,13 +176,8 @@ export function YearlySectorBudgetCard({
   const loadSectorTransactions = async () => {
     setIsLoadingTransactions(true);
     try {
-      // Filter transactions for this sector and selected year, excluding excluded transactions
+      // Filter transactions for this sector and selected year (show all, including excluded)
       const filtered = allTransactions.filter((transaction) => {
-        // Exclude transactions that are marked as excluded from monthly budget
-        if (transaction.excluded_from_yearly_budget) {
-          return false;
-        }
-
         // Find the sector that this transaction's category belongs to
         const transactionSector = sectors.find(
           (sector) =>
@@ -472,11 +469,17 @@ export function YearlySectorBudgetCard({
                     allTransactions={allTransactions}
                     deleteTransaction={deleteTransaction}
                     handleSetEditingTransaction={handleSetEditingTransaction}
-                    onToggleExclude={onToggleExclude}
+                    onToggleExclude={
+                      onToggleExclude
+                        ? (transactionId: string, excluded: boolean) =>
+                            onToggleExclude(transactionId, excluded, "yearly")
+                        : undefined
+                    }
                     incomeImageUrl={incomeImageUrl}
                     settlementImageUrl={settlementImageUrl}
                     reimbursementImageUrl={reimbursementImageUrl}
                     categories={categories}
+                    exclusionType={exclusionType}
                   />
                 );
               })}
@@ -728,10 +731,16 @@ export function YearlySectorBudgetCard({
                     allTransactions={allTransactions}
                     variant="dialog"
                     showExcludeOption={true}
-                    onToggleExclude={onToggleExclude}
+                    onToggleExclude={
+                      onToggleExclude
+                        ? (transactionId: string, excluded: boolean) =>
+                            onToggleExclude(transactionId, excluded, "yearly")
+                        : undefined
+                    }
                     incomeImageUrl={incomeImageUrl}
                     settlementImageUrl={settlementImageUrl}
                     reimbursementImageUrl={reimbursementImageUrl}
+                    exclusionType={exclusionType}
                   />
                 </div>
               </>

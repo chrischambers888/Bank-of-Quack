@@ -55,6 +55,7 @@ interface YearlyCategoryBudgetCardProps {
   reimbursementImageUrl?: string | null;
   hideTransactionsButton?: boolean;
   categories?: Category[];
+  exclusionType?: "monthly" | "yearly";
 }
 
 export function YearlyCategoryBudgetCard({
@@ -78,6 +79,7 @@ export function YearlyCategoryBudgetCard({
   reimbursementImageUrl,
   hideTransactionsButton = false,
   categories = [],
+  exclusionType = "yearly",
 }: YearlyCategoryBudgetCardProps) {
   const [showTransactions, setShowTransactions] = useState(false);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
@@ -178,13 +180,8 @@ export function YearlyCategoryBudgetCard({
   const loadTransactions = async () => {
     setIsLoadingTransactions(true);
     try {
-      // Filter transactions for this category and selected year, excluding excluded transactions
+      // Filter transactions for this category and selected year (show all, including excluded)
       const filtered = allTransactions.filter((transaction) => {
-        // Exclude transactions that are marked as excluded from monthly budget
-        if (transaction.excluded_from_yearly_budget) {
-          return false;
-        }
-
         if (transaction.category_id !== category_id) return false;
 
         const transactionDate = new Date(transaction.date);
@@ -498,7 +495,12 @@ export function YearlyCategoryBudgetCard({
                     allTransactions={allTransactions}
                     deleteTransaction={deleteTransaction}
                     handleSetEditingTransaction={handleSetEditingTransaction}
-                    onToggleExclude={onToggleExclude}
+                    onToggleExclude={
+                      onToggleExclude
+                        ? (transactionId: string, excluded: boolean) =>
+                            onToggleExclude(transactionId, excluded, "yearly")
+                        : undefined
+                    }
                     incomeImageUrl={incomeImageUrl}
                     settlementImageUrl={settlementImageUrl}
                     reimbursementImageUrl={reimbursementImageUrl}
@@ -506,6 +508,7 @@ export function YearlyCategoryBudgetCard({
                     categories={categories}
                     variant="dialog"
                     showExcludeOption={true}
+                    exclusionType={exclusionType}
                   />
                 </div>
               </>
