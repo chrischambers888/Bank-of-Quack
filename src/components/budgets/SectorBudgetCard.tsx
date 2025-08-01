@@ -4,6 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomProgress } from "@/components/ui/custom-progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Edit,
   Trash2,
   TrendingUp,
@@ -12,10 +18,20 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
+  HelpCircle,
 } from "lucide-react";
-import { SectorBudgetSummary, SelectedMonth, BudgetSummary } from "@/types";
+import {
+  SectorBudgetSummary,
+  SelectedMonth,
+  BudgetSummary,
+  Transaction,
+  Sector,
+  Category,
+} from "@/types";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import { supabase } from "@/supabaseClient";
+import TransactionList from "@/components/TransactionList";
+import { CategoryBudgetCard } from "./CategoryBudgetCard";
 
 interface SectorBudgetCardProps {
   sectorBudgetSummary: SectorBudgetSummary;
@@ -25,15 +41,25 @@ interface SectorBudgetCardProps {
   user1AvatarUrl?: string | null;
   user2AvatarUrl?: string | null;
   budgetSummaries?: BudgetSummary[];
-  sectors?: any[];
+  sectors?: Sector[];
   isExpanded?: boolean;
   onToggleExpansion?: () => void;
-  categories?: any[];
+  categories?: Category[];
   onEditBudget?: (budget: BudgetSummary) => void;
   onDeleteBudget?: (categoryId: string) => void;
   userNames?: { user1: string; user2: string };
   getMonthName?: (month: SelectedMonth) => string;
   formatCurrency?: (amount: number | null | undefined) => string;
+  // New props for transaction functionality
+  allTransactions?: Transaction[];
+  deleteTransaction?: (id: string) => Promise<void>;
+  handleSetEditingTransaction?: (transaction: Transaction) => void;
+  onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
+  incomeImageUrl?: string | null;
+  settlementImageUrl?: string | null;
+  reimbursementImageUrl?: string | null;
+  // Hide "?" button when rendered inside a modal
+  hideTransactionsButton?: boolean;
 }
 
 export function SectorBudgetCard({
@@ -53,11 +79,24 @@ export function SectorBudgetCard({
   userNames: propUserNames,
   getMonthName: propGetMonthName,
   formatCurrency: propFormatCurrency,
+  allTransactions = [],
+  deleteTransaction,
+  handleSetEditingTransaction,
+  onToggleExclude,
+  incomeImageUrl,
+  settlementImageUrl,
+  reimbursementImageUrl,
+  hideTransactionsButton,
 }: SectorBudgetCardProps) {
   const [userNames, setUserNames] = useState({
     user1: "User 1",
     user2: "User 2",
   });
+  const [showTransactions, setShowTransactions] = useState(false);
+  const [sectorTransactions, setSectorTransactions] = useState<Transaction[]>(
+    []
+  );
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const { yellowThreshold } = useBudgetSettings();
 
   useEffect(() => {
@@ -83,6 +122,65 @@ export function SectorBudgetCard({
 
     loadUserNames();
   }, []);
+
+  // Function to load transactions for this sector
+  const loadSectorTransactions = async () => {
+    setIsLoadingTransactions(true);
+    try {
+      // Find the current sector
+      const currentSector = sectors.find(
+        (s) => s.id === sectorBudgetSummary.sector_id
+      );
+      if (!currentSector) {
+        console.error("Sector not found:", sectorBudgetSummary.sector_id);
+        return;
+      }
+
+      // Fetch transactions for all categories in the sector
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .in("category_id", currentSector.category_ids)
+        .gte(
+          "date",
+          `${selectedMonth.year}-${selectedMonth.month
+            .toString()
+            .padStart(2, "0")}-01`
+        )
+        .lt(
+          "date",
+          `${selectedMonth.year}-${(selectedMonth.month + 1)
+            .toString()
+            .padStart(2, "0")}-01`
+        )
+        .order("date", { ascending: false });
+
+      // Find reimbursements that reimburse these transactions
+      const relevantExpenseIds = (transactions || []).map((t) => t.id);
+      const relevantReimbursements = allTransactions.filter(
+        (t) =>
+          t.transaction_type === "reimbursement" &&
+          t.reimburses_transaction_id &&
+          relevantExpenseIds.includes(t.reimburses_transaction_id)
+      );
+
+      const finalTransactions = [
+        ...(transactions || []),
+        ...relevantReimbursements,
+      ];
+
+      setSectorTransactions(finalTransactions);
+    } catch (error) {
+      console.error("Error loading sector transactions:", error);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  const handleViewTransactions = () => {
+    setShowTransactions(true);
+    loadSectorTransactions();
+  };
 
   // Use prop values if provided, otherwise use local state
   const finalUserNames = propUserNames || userNames;
@@ -225,6 +323,17 @@ export function SectorBudgetCard({
                 )}
               </Button>
             )}
+            {!hideTransactionsButton && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleViewTransactions}
+                className="h-8 w-8"
+                title="View transactions for this sector"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -337,168 +446,170 @@ export function SectorBudgetCard({
                 </span>
               </div>
 
-              {/* User Spending Breakdown */}
-              {(budget_type === "split" || budget_type === "absolute") && (
-                <div className="text-xs text-muted-foreground space-y-1 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span>
-                      {finalUserNames.user1}:{" "}
-                      {finalFormatCurrency(current_period_user1_spent)}
-                      {budget_type === "split" &&
-                        ` / ${finalFormatCurrency(user1_amount)}`}
-                    </span>
-                    <span>
-                      {finalUserNames.user2}:{" "}
-                      {finalFormatCurrency(current_period_user2_spent)}
-                      {budget_type === "split" &&
-                        ` / ${finalFormatCurrency(user2_amount)}`}
-                    </span>
-                  </div>
-                  <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
-                    {/* User 1 Progress */}
-                    <div
-                      className="absolute left-0 h-full transition-all duration-300"
-                      style={{
-                        width: `${
-                          ((current_period_user1_spent || 0) /
-                            Math.max(
-                              (current_period_user1_spent || 0) +
-                                (current_period_user2_spent || 0),
-                              1
-                            )) *
-                          100
-                        }%`,
-                        backgroundColor:
-                          budget_type === "split"
-                            ? // For split budgets, use color coding based on budget adherence
-                              (current_period_budget === 0 &&
-                                (current_period_user1_spent || 0) > 0) ||
-                              (current_period_user1_spent || 0) >=
-                                (user1_amount || 0)
-                              ? "rgb(239 68 68)"
-                              : (current_period_user1_spent || 0) >=
-                                ((user1_amount || 0) * yellowThreshold) / 100
-                              ? "rgb(234 179 8)"
-                              : "rgb(34 197 94)"
-                            : // For absolute budgets, use neutral gray
-                              "rgb(156 163 175)",
-                      }}
-                    />
-                    {/* User 2 Progress */}
-                    <div
-                      className="absolute right-0 h-full transition-all duration-300"
-                      style={{
-                        width: `${
-                          ((current_period_user2_spent || 0) /
-                            Math.max(
-                              (current_period_user1_spent || 0) +
-                                (current_period_user2_spent || 0),
-                              1
-                            )) *
-                          100
-                        }%`,
-                        backgroundColor:
-                          budget_type === "split"
-                            ? // For split budgets, use color coding based on budget adherence
-                              (current_period_budget === 0 &&
-                                (current_period_user2_spent || 0) > 0) ||
-                              (current_period_user2_spent || 0) >=
-                                (user2_amount || 0)
-                              ? "rgb(239 68 68)"
-                              : (current_period_user2_spent || 0) >=
-                                ((user2_amount || 0) * yellowThreshold) / 100
-                              ? "rgb(234 179 8)"
-                              : "rgb(34 197 94)"
-                            : // For absolute budgets, use neutral gray
-                              "rgb(156 163 175)",
-                      }}
-                    />
-                    {/* User 1 Avatar */}
-                    <div
-                      className="absolute top-1/2 flex items-center justify-center"
-                      style={{
-                        left: `calc(${
-                          ((current_period_user1_spent || 0) /
-                            Math.max(
-                              (current_period_user1_spent || 0) +
-                                (current_period_user2_spent || 0),
-                              1
-                            )) *
-                          100
-                        }% / 2)`,
-                        transform: "translate(-50%, -50%)",
-                      }}
-                    >
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
-                        {user1AvatarUrl ? (
-                          <img
-                            src={user1AvatarUrl}
-                            alt={`${finalUserNames.user1} avatar`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs text-white font-bold">
-                            {finalUserNames.user1.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+              {/* User Spending Breakdown - Show in BudgetModal context */}
+              {hideTransactionsButton &&
+                ((current_period_user1_spent || 0) > 0 ||
+                  (current_period_user2_spent || 0) > 0) && (
+                  <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                    <div className="flex justify-between items-center">
+                      <span>
+                        {finalUserNames.user1}:{" "}
+                        {finalFormatCurrency(current_period_user1_spent)}
+                        {budget_type === "split" &&
+                          ` / ${finalFormatCurrency(user1_amount)}`}
+                      </span>
+                      <span>
+                        {finalUserNames.user2}:{" "}
+                        {finalFormatCurrency(current_period_user2_spent)}
+                        {budget_type === "split" &&
+                          ` / ${finalFormatCurrency(user2_amount)}`}
+                      </span>
                     </div>
-                    {/* User 2 Avatar */}
-                    <div
-                      className="absolute top-1/2 flex items-center justify-center"
-                      style={{
-                        left: `calc(${
-                          ((current_period_user1_spent || 0) /
-                            Math.max(
-                              (current_period_user1_spent || 0) +
-                                (current_period_user2_spent || 0),
-                              1
-                            )) *
-                          100
-                        }% + (${
-                          ((current_period_user2_spent || 0) /
-                            Math.max(
-                              (current_period_user1_spent || 0) +
-                                (current_period_user2_spent || 0),
-                              1
-                            )) *
-                          100
-                        }% / 2))`,
-                        transform: "translate(-50%, -50%)",
-                      }}
-                    >
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
-                        {user2AvatarUrl ? (
-                          <img
-                            src={user2AvatarUrl}
-                            alt={`${finalUserNames.user2} avatar`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs text-white font-bold">
-                            {finalUserNames.user2.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                    <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
+                      {/* User 1 Progress */}
+                      <div
+                        className="absolute left-0 h-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }%`,
+                          backgroundColor:
+                            budget_type === "split"
+                              ? // For split budgets, use color coding based on budget adherence
+                                (current_period_budget === 0 &&
+                                  (current_period_user1_spent || 0) > 0) ||
+                                (current_period_user1_spent || 0) >=
+                                  (user1_amount || 0)
+                                ? "rgb(239 68 68)"
+                                : (current_period_user1_spent || 0) >=
+                                  ((user1_amount || 0) * yellowThreshold) / 100
+                                ? "rgb(234 179 8)"
+                                : "rgb(34 197 94)"
+                              : // For absolute budgets, use neutral gray
+                                "rgb(156 163 175)",
+                        }}
+                      />
+                      {/* User 2 Progress */}
+                      <div
+                        className="absolute right-0 h-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            ((current_period_user2_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }%`,
+                          backgroundColor:
+                            budget_type === "split"
+                              ? // For split budgets, use color coding based on budget adherence
+                                (current_period_budget === 0 &&
+                                  (current_period_user2_spent || 0) > 0) ||
+                                (current_period_user2_spent || 0) >=
+                                  (user2_amount || 0)
+                                ? "rgb(239 68 68)"
+                                : (current_period_user2_spent || 0) >=
+                                  ((user2_amount || 0) * yellowThreshold) / 100
+                                ? "rgb(234 179 8)"
+                                : "rgb(34 197 94)"
+                              : // For absolute budgets, use neutral gray
+                                "rgb(156 163 175)",
+                        }}
+                      />
+                      {/* User 1 Avatar */}
+                      <div
+                        className="absolute top-1/2 flex items-center justify-center"
+                        style={{
+                          left: `calc(${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }% / 2)`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                          {user1AvatarUrl ? (
+                            <img
+                              src={user1AvatarUrl}
+                              alt={`${finalUserNames.user1} avatar`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs text-white font-bold">
+                              {finalUserNames.user1.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {/* User 2 Avatar */}
+                      <div
+                        className="absolute top-1/2 flex items-center justify-center"
+                        style={{
+                          left: `calc(${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }% + (${
+                            ((current_period_user2_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }% / 2))`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                          {user2AvatarUrl ? (
+                            <img
+                              src={user2AvatarUrl}
+                              alt={`${finalUserNames.user2} avatar`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs text-white font-bold">
+                              {finalUserNames.user2.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Dividing Line */}
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-white opacity-80"
+                        style={{
+                          left: `${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }%`,
+                        }}
+                      />
                     </div>
-                    {/* Dividing Line */}
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-white opacity-80"
-                      style={{
-                        left: `${
-                          ((current_period_user1_spent || 0) /
-                            Math.max(
-                              (current_period_user1_spent || 0) +
-                                (current_period_user2_spent || 0),
-                              1
-                            )) *
-                          100
-                        }%`,
-                      }}
-                    />
                   </div>
-                </div>
-              )}
+                )}
             </div>
           )}
 
@@ -541,144 +652,28 @@ export function SectorBudgetCard({
                   totalBudget > 0 ? (spent / totalBudget) * 100 : 0;
 
                 return (
-                  <div
+                  <CategoryBudgetCard
                     key={budget.category_id}
-                    className="ml-4 border-l-4 border-primary/30 bg-card/50 rounded-lg p-4 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        {category?.image_url ? (
-                          <img
-                            src={category.image_url}
-                            alt={category.name}
-                            className="w-6 h-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                            <DollarSign className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div>
-                          <h4 className="font-medium text-sm">
-                            {category?.name}
-                          </h4>
-                          <p className="text-xs text-muted-foreground">
-                            {budget.budget_type === "absolute"
-                              ? "Absolute"
-                              : "Split"}{" "}
-                            Budget
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            // Ensure budget has required fields before editing
-                            if (!budget.budget_id) {
-                              console.error("Budget ID is missing:", budget);
-                              return;
-                            }
-                            onEditBudget(budget);
-                          }}
-                          className="h-6 w-6"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onDeleteBudget(budget.category_id)}
-                          className="h-6 w-6"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="space-y-2 mb-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {finalGetMonthName(selectedMonth)}:
-                        </span>
-                        <span className="font-medium">
-                          {finalFormatCurrency(spent)} /{" "}
-                          {finalFormatCurrency(totalBudget)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            percentageUsed > 100
-                              ? "bg-red-500"
-                              : percentageUsed >= 80
-                              ? "bg-yellow-500"
-                              : "bg-green-500"
-                          }`}
-                          style={{
-                            width: `${Math.min(percentageUsed, 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          {percentageUsed.toFixed(1)}% used
-                        </span>
-                        <span
-                          className={
-                            remaining >= 0 ? "text-green-600" : "text-red-600"
-                          }
-                        >
-                          {finalFormatCurrency(Math.abs(remaining))}{" "}
-                          {remaining >= 0 ? "under" : "over"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Budget Details */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Budget</p>
-                        <p className="font-medium">
-                          {finalFormatCurrency(totalBudget)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Spent</p>
-                        <p className="text-muted-foreground">
-                          {finalFormatCurrency(spent)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* User Spending for Split Budgets */}
-                    {budget.budget_type === "split" && (
-                      <div className="text-xs text-muted-foreground space-y-1 pt-2">
-                        <div className="flex justify-between items-center">
-                          <span>
-                            {finalUserNames.user1}:{" "}
-                            {finalFormatCurrency(
-                              budget.current_period_user1_spent || 0
-                            )}
-                            {` / ${finalFormatCurrency(
-                              budget.user1_amount || 0
-                            )}`}
-                          </span>
-                          <span>
-                            {finalUserNames.user2}:{" "}
-                            {finalFormatCurrency(
-                              budget.current_period_user2_spent || 0
-                            )}
-                            {` / ${finalFormatCurrency(
-                              budget.user2_amount || 0
-                            )}`}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    budgetSummary={budget}
+                    onEdit={onEditBudget}
+                    onDelete={onDeleteBudget}
+                    selectedMonth={selectedMonth}
+                    user1AvatarUrl={user1AvatarUrl}
+                    user2AvatarUrl={user2AvatarUrl}
+                    category={category}
+                    userNames={finalUserNames}
+                    getMonthName={finalGetMonthName}
+                    formatCurrency={finalFormatCurrency}
+                    allTransactions={allTransactions}
+                    deleteTransaction={deleteTransaction}
+                    handleSetEditingTransaction={handleSetEditingTransaction}
+                    onToggleExclude={onToggleExclude}
+                    incomeImageUrl={incomeImageUrl}
+                    settlementImageUrl={settlementImageUrl}
+                    reimbursementImageUrl={reimbursementImageUrl}
+                    hideTransactionsButton={hideTransactionsButton}
+                    categories={categories}
+                  />
                 );
               })}
 
@@ -733,6 +728,212 @@ export function SectorBudgetCard({
           </div>
         )}
       </CardContent>
+
+      {/* Transactions Dialog */}
+      <Dialog open={showTransactions} onOpenChange={setShowTransactions}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden bg-gradient-to-b from-[#004D40] to-[#26A69A] text-gray-200 border-gray-600">
+          <DialogHeader>
+            <DialogTitle className="text-gray-200">
+              {sector_name} - {finalGetMonthName(selectedMonth)} Transactions
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {isLoadingTransactions ? (
+              <div className="text-center py-8">
+                <div className="text-white/80">Loading transactions...</div>
+              </div>
+            ) : (
+              <>
+                {/* User Spending Breakdown - Show above transactions */}
+                {((current_period_user1_spent || 0) > 0 ||
+                  (current_period_user2_spent || 0) > 0) && (
+                  <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                    <div className="flex justify-between items-center">
+                      <span>
+                        {finalUserNames.user1}:{" "}
+                        {finalFormatCurrency(current_period_user1_spent)}
+                        {budget_type === "split" &&
+                          ` / ${finalFormatCurrency(user1_amount)}`}
+                      </span>
+                      <span>
+                        {finalUserNames.user2}:{" "}
+                        {finalFormatCurrency(current_period_user2_spent)}
+                        {budget_type === "split" &&
+                          ` / ${finalFormatCurrency(user2_amount)}`}
+                      </span>
+                    </div>
+                    <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
+                      {/* User 1 Progress */}
+                      <div
+                        className="absolute left-0 h-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }%`,
+                          backgroundColor:
+                            budget_type === "split"
+                              ? // For split budgets, use color coding based on budget adherence
+                                (current_period_budget === 0 &&
+                                  (current_period_user1_spent || 0) > 0) ||
+                                (current_period_user1_spent || 0) >=
+                                  (user1_amount || 0)
+                                ? "rgb(239 68 68)"
+                                : (current_period_user1_spent || 0) >=
+                                  ((user1_amount || 0) * yellowThreshold) / 100
+                                ? "rgb(234 179 8)"
+                                : "rgb(34 197 94)"
+                              : // For absolute budgets, use neutral gray
+                                "rgb(156 163 175)",
+                        }}
+                      />
+                      {/* User 2 Progress */}
+                      <div
+                        className="absolute right-0 h-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            ((current_period_user2_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }%`,
+                          backgroundColor:
+                            budget_type === "split"
+                              ? // For split budgets, use color coding based on budget adherence
+                                (current_period_budget === 0 &&
+                                  (current_period_user2_spent || 0) > 0) ||
+                                (current_period_user2_spent || 0) >=
+                                  (user2_amount || 0)
+                                ? "rgb(239 68 68)"
+                                : (current_period_user2_spent || 0) >=
+                                  ((user2_amount || 0) * yellowThreshold) / 100
+                                ? "rgb(234 179 8)"
+                                : "rgb(34 197 94)"
+                              : // For absolute budgets, use neutral gray
+                                "rgb(156 163 175)",
+                        }}
+                      />
+                      {/* User 1 Avatar */}
+                      <div
+                        className="absolute top-1/2 flex items-center justify-center"
+                        style={{
+                          left: `calc(${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }% / 2)`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                          {user1AvatarUrl ? (
+                            <img
+                              src={user1AvatarUrl}
+                              alt={`${finalUserNames.user1} avatar`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs text-white font-bold">
+                              {finalUserNames.user1.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* User 2 Avatar */}
+                      <div
+                        className="absolute top-1/2 flex items-center justify-center"
+                        style={{
+                          left: `calc(${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }% + (${
+                            ((current_period_user2_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }% / 2))`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
+                          {user2AvatarUrl ? (
+                            <img
+                              src={user2AvatarUrl}
+                              alt={`${finalUserNames.user2} avatar`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs text-white font-bold">
+                              {finalUserNames.user2.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Dividing Line */}
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-white opacity-80"
+                        style={{
+                          left: `${
+                            ((current_period_user1_spent || 0) /
+                              Math.max(
+                                (current_period_user1_spent || 0) +
+                                  (current_period_user2_spent || 0),
+                                1
+                              )) *
+                            100
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Scrollable Transactions List */}
+                <div className="flex-1 overflow-y-auto max-h-[60vh]">
+                  <TransactionList
+                    transactions={sectorTransactions}
+                    categories={categories}
+                    userNames={[finalUserNames.user1, finalUserNames.user2]}
+                    showValues={true}
+                    deleteTransaction={
+                      deleteTransaction || (() => Promise.resolve())
+                    }
+                    handleSetEditingTransaction={handleSetEditingTransaction}
+                    allTransactions={allTransactions}
+                    variant="dialog"
+                    showExcludeOption={true}
+                    onToggleExclude={onToggleExclude}
+                    incomeImageUrl={incomeImageUrl}
+                    settlementImageUrl={settlementImageUrl}
+                    reimbursementImageUrl={reimbursementImageUrl}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

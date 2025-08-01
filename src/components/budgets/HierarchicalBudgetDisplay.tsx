@@ -40,6 +40,14 @@ interface HierarchicalBudgetDisplayProps {
   onDeleteSectorBudget: (sectorId: string) => void;
   onCreateBudget: (category: Category) => void;
   onCreateSectorBudget: (sector: Sector) => void;
+  // Transaction-related props
+  allTransactions?: Transaction[];
+  deleteTransaction?: (id: string) => Promise<void>;
+  handleSetEditingTransaction?: (transaction: Transaction) => void;
+  onToggleExclude?: (transactionId: string, excluded: boolean) => Promise<void>;
+  incomeImageUrl?: string | null;
+  settlementImageUrl?: string | null;
+  reimbursementImageUrl?: string | null;
 }
 
 export function HierarchicalBudgetDisplay({
@@ -56,6 +64,13 @@ export function HierarchicalBudgetDisplay({
   onDeleteSectorBudget,
   onCreateBudget,
   onCreateSectorBudget,
+  allTransactions = [],
+  deleteTransaction,
+  handleSetEditingTransaction,
+  onToggleExclude,
+  incomeImageUrl,
+  settlementImageUrl,
+  reimbursementImageUrl,
 }: HierarchicalBudgetDisplayProps) {
   const [expandedSectors, setExpandedSectors] = useState<Set<string>>(
     new Set()
@@ -228,6 +243,15 @@ export function HierarchicalBudgetDisplay({
                         selectedMonth={selectedMonth}
                         user1AvatarUrl={user1AvatarUrl}
                         user2AvatarUrl={user2AvatarUrl}
+                        allTransactions={allTransactions}
+                        deleteTransaction={deleteTransaction}
+                        handleSetEditingTransaction={
+                          handleSetEditingTransaction
+                        }
+                        onToggleExclude={onToggleExclude}
+                        incomeImageUrl={incomeImageUrl}
+                        settlementImageUrl={settlementImageUrl}
+                        reimbursementImageUrl={reimbursementImageUrl}
                       />
                     </div>
                   )}

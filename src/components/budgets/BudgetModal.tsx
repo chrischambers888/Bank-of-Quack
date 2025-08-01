@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BudgetCard } from "./BudgetCard";
 import { SectorBudgetCard } from "./SectorBudgetCard";
+import { CategoryBudgetCard } from "./CategoryBudgetCard";
 import TransactionList from "@/components/TransactionList";
 import {
   BudgetSummary,
@@ -94,6 +95,14 @@ export function BudgetModal({
                 onDelete={onDeleteSectorBudget}
                 budgetSummaries={budgetSummaries}
                 sectors={sectors}
+                allTransactions={allTransactions}
+                deleteTransaction={deleteTransaction}
+                handleSetEditingTransaction={handleSetEditingTransaction}
+                onToggleExclude={onToggleExclude}
+                incomeImageUrl={incomeImageUrl}
+                settlementImageUrl={settlementImageUrl}
+                reimbursementImageUrl={reimbursementImageUrl}
+                hideTransactionsButton={true}
               />
             ) : (
               <div className="text-center py-8">
@@ -111,14 +120,38 @@ export function BudgetModal({
               </div>
             )
           ) : (
-            <BudgetCard
+            <CategoryBudgetCard
               budgetSummary={modalData.data.budgetSummary}
               onEdit={onEditBudget}
               onDelete={onDeleteBudget}
+              selectedMonth={selectedMonth}
               user1AvatarUrl={user1AvatarUrl}
               user2AvatarUrl={user2AvatarUrl}
-              selectedMonth={selectedMonth}
+              category={modalData.data.category}
+              userNames={{ user1: userNames[0], user2: userNames[1] }}
+              getMonthName={(month: SelectedMonth) => {
+                const date = new Date(month.year, month.month - 1, 1);
+                return date.toLocaleDateString("en-US", {
+                  month: "long",
+                  year: "numeric",
+                });
+              }}
+              formatCurrency={(amount: number | null | undefined) => {
+                if (amount === null || amount === undefined) return "$0.00";
+                return new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                }).format(amount);
+              }}
+              allTransactions={allTransactions}
+              deleteTransaction={deleteTransaction}
+              handleSetEditingTransaction={handleSetEditingTransaction}
+              onToggleExclude={onToggleExclude}
+              incomeImageUrl={incomeImageUrl}
+              settlementImageUrl={settlementImageUrl}
+              reimbursementImageUrl={reimbursementImageUrl}
               hideTransactionsButton={true}
+              categories={categories}
             />
           )}
 

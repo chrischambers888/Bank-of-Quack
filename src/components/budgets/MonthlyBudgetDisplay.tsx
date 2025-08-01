@@ -49,6 +49,7 @@ import {
   getExcludedSectors,
 } from "./budgetUtils";
 import { SectorBudgetCard } from "./SectorBudgetCard";
+import { CategoryBudgetCard } from "./CategoryBudgetCard";
 
 interface MonthlyBudgetDisplayProps {
   sectors: Sector[];
@@ -508,6 +509,13 @@ export function MonthlyBudgetDisplay({
                   formatCurrency={(amount: number | null | undefined) =>
                     formatCurrency(amount || 0)
                   }
+                  allTransactions={allTransactions}
+                  deleteTransaction={deleteTransaction}
+                  handleSetEditingTransaction={handleSetEditingTransaction}
+                  onToggleExclude={onToggleExclude}
+                  incomeImageUrl={incomeImageUrl}
+                  settlementImageUrl={settlementImageUrl}
+                  reimbursementImageUrl={reimbursementImageUrl}
                 />
               </div>
             );
@@ -653,80 +661,35 @@ export function MonthlyBudgetDisplay({
                     const sector = sectors.find((s) =>
                       s.category_ids.includes(budget.category_id)
                     );
-                    const totalBudget =
-                      budget.budget_type === "absolute"
-                        ? budget.absolute_amount || 0
-                        : (budget.user1_amount || 0) +
-                          (budget.user2_amount || 0);
-                    const spent = budget.current_period_spent || 0;
-                    const remaining = totalBudget - spent;
 
                     return (
-                      <div
+                      <CategoryBudgetCard
                         key={budget.category_id}
-                        className="border rounded-lg p-4"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            {category?.image_url ? (
-                              <img
-                                src={category.image_url}
-                                alt={category.name}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-medium">{category?.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Sector: {sector?.name || "Unknown"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-                          <div>
-                            <p className="text-muted-foreground">Budget</p>
-                            <p className="font-medium">
-                              {formatCurrency(totalBudget)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Spent</p>
-                            <p className="text-muted-foreground">
-                              {formatCurrency(spent)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Remaining</p>
-                            <p
-                              className={
-                                remaining >= 0
-                                  ? "text-green-600 font-medium"
-                                  : "text-red-600 font-medium"
-                              }
-                            >
-                              {formatCurrency(remaining)}
-                            </p>
-                          </div>
-                        </div>
-                        {sector && (
-                          <div className="flex justify-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onCreateSectorBudget(sector)}
-                              className="w-full"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Create Sector Budget
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                        budgetSummary={budget}
+                        onEdit={onEditBudget}
+                        onDelete={onDeleteBudget}
+                        selectedMonth={selectedMonth}
+                        user1AvatarUrl={user1AvatarUrl}
+                        user2AvatarUrl={user2AvatarUrl}
+                        category={category}
+                        userNames={{ user1: userNames[0], user2: userNames[1] }}
+                        getMonthName={getMonthName}
+                        formatCurrency={(amount: number | null | undefined) => {
+                          if (amount === null || amount === undefined)
+                            return "$0.00";
+                          return formatCurrency(amount);
+                        }}
+                        allTransactions={allTransactions}
+                        deleteTransaction={deleteTransaction}
+                        handleSetEditingTransaction={
+                          handleSetEditingTransaction
+                        }
+                        onToggleExclude={onToggleExclude}
+                        incomeImageUrl={incomeImageUrl}
+                        settlementImageUrl={settlementImageUrl}
+                        reimbursementImageUrl={reimbursementImageUrl}
+                        categories={categories}
+                      />
                     );
                   })}
                 </div>
