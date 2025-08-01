@@ -1081,11 +1081,49 @@ export function BudgetsPage() {
     setIsFormOpen(true);
   };
 
-  const handleEditBudget = (budget: CategoryBudget) => {
-    const category = categories.find((c) => c.id === budget.category_id);
+  const handleEditBudget = (
+    budget: CategoryBudget | BudgetSummary | { category_id: string }
+  ) => {
+    // Handle both CategoryBudget and BudgetSummary objects, or just category_id for new budgets
+    const categoryId = budget.category_id;
+    const budgetId =
+      "id" in budget
+        ? budget.id
+        : "budget_id" in budget
+        ? budget.budget_id
+        : null;
+
+    // If no budget ID is provided, this is a new budget creation
+    if (!budgetId) {
+      const category = categories.find((c) => c.id === categoryId);
+      if (category) {
+        setSelectedCategory(category);
+        setEditingBudget(null);
+        setIsFormOpen(true);
+      }
+      return;
+    }
+
+    const category = categories.find((c) => c.id === categoryId);
     if (category) {
       setSelectedCategory(category);
-      setEditingBudget(budget);
+
+      // Convert to CategoryBudget format if needed
+      const categoryBudget: CategoryBudget =
+        "id" in budget
+          ? budget
+          : {
+              id: (budget as BudgetSummary).budget_id!,
+              category_id: budget.category_id,
+              year: selectedMonth.year,
+              month: selectedMonth.month,
+              budget_type: (budget as BudgetSummary).budget_type!,
+              absolute_amount: (budget as BudgetSummary).absolute_amount,
+              user1_amount: (budget as BudgetSummary).user1_amount,
+              user2_amount: (budget as BudgetSummary).user2_amount,
+            };
+
+      setEditingBudget(categoryBudget);
       setIsFormOpen(true);
     }
   };

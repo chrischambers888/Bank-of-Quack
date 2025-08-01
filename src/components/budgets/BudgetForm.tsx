@@ -130,37 +130,56 @@ export function BudgetForm({
 
     try {
       if (existingBudget) {
+        // Validate existingBudget has required fields
+        if (!existingBudget.id || !existingBudget.category_id) {
+          throw new Error(
+            "Invalid budget data. Please try refreshing the page."
+          );
+        }
+
         // Update existing budget
         if (isYearly) {
-          const { error } = await supabase.rpc(
-            "update_yearly_budget_for_category",
-            {
-              p_budget_id: existingBudget.id,
-              p_budget_type: formData.budget_type,
-              p_absolute_amount:
+          // Use direct SQL update for yearly budgets too
+          const { error } = await supabase
+            .from("yearly_category_budgets")
+            .update({
+              budget_type: formData.budget_type,
+              absolute_amount:
                 formData.budget_type === "absolute"
                   ? formData.absolute_amount
                   : null,
-              p_user1_amount:
+              user1_amount:
                 formData.budget_type === "split" ? formData.user1_amount : null,
-              p_user2_amount:
+              user2_amount:
                 formData.budget_type === "split" ? formData.user2_amount : null,
-            }
-          );
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existingBudget.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.rpc("update_budget_for_month", {
-            p_budget_id: existingBudget.id,
-            p_budget_type: formData.budget_type,
-            p_absolute_amount:
-              formData.budget_type === "absolute"
-                ? formData.absolute_amount
-                : null,
-            p_user1_amount:
-              formData.budget_type === "split" ? formData.user1_amount : null,
-            p_user2_amount:
-              formData.budget_type === "split" ? formData.user2_amount : null,
-          });
+          // Ensure we have a valid budget ID
+          if (!existingBudget.id) {
+            throw new Error(
+              "Budget ID is missing. Please try refreshing the page."
+            );
+          }
+
+          // Use direct SQL update instead of RPC function to avoid parameter issues
+          const { error } = await supabase
+            .from("category_budgets")
+            .update({
+              budget_type: formData.budget_type,
+              absolute_amount:
+                formData.budget_type === "absolute"
+                  ? formData.absolute_amount
+                  : null,
+              user1_amount:
+                formData.budget_type === "split" ? formData.user1_amount : null,
+              user2_amount:
+                formData.budget_type === "split" ? formData.user2_amount : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existingBudget.id);
           if (error) throw error;
         }
       } else {

@@ -574,7 +574,14 @@ export function SectorBudgetCard({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => onEditBudget(budget)}
+                          onClick={() => {
+                            // Ensure budget has required fields before editing
+                            if (!budget.budget_id) {
+                              console.error("Budget ID is missing:", budget);
+                              return;
+                            }
+                            onEditBudget(budget);
+                          }}
                           className="h-6 w-6"
                         >
                           <Edit className="h-3 w-3" />

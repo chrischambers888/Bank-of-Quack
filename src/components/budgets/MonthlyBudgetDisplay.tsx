@@ -452,20 +452,11 @@ export function MonthlyBudgetDisplay({
             return b.sectorPercentage - a.sectorPercentage;
           })
           .map(({ sector, sectorBudget }) => {
-            // Check if sector has no budget defined (no budget_id) or has a zero budget
+            // Check if sector has no budget defined (no budget_id)
             const hasNoBudget = !sectorBudget || !sectorBudget.budget_id;
-            const hasZeroBudget =
-              sectorBudget &&
-              sectorBudget.budget_id &&
-              ((sectorBudget.budget_type === "absolute" &&
-                (sectorBudget.absolute_amount || 0) === 0) ||
-                (sectorBudget.budget_type === "split" &&
-                  (sectorBudget.user1_amount || 0) +
-                    (sectorBudget.user2_amount || 0) ===
-                    0));
 
-            if (hasNoBudget || hasZeroBudget) {
-              // Show create budget card for sectors without budgets or with zero budgets
+            if (hasNoBudget) {
+              // Show create budget card for sectors without budgets
               return (
                 <Card key={sector.id} className="border-dashed border-2">
                   <CardHeader>
@@ -521,116 +512,6 @@ export function MonthlyBudgetDisplay({
               </div>
             );
           })}
-
-        {/* Categories without sector budgets */}
-        {(() => {
-          const orphanedBudgets = getOrphanedBudgetSummaries(
-            sectors,
-            budgetSummaries,
-            sectorBudgetSummaries
-          );
-
-          if (orphanedBudgets.length === 0) return null;
-
-          return (
-            <Card className="border-yellow-200 bg-yellow-50/50">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  <span>Orphaned Category Budgets</span>
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  These category budgets exist but their sectors don't have
-                  budgets.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {orphanedBudgets.map((budget) => {
-                  const category = categories.find(
-                    (c) => c.id === budget.category_id
-                  );
-                  const sector = sectors.find((s) =>
-                    s.category_ids.includes(budget.category_id)
-                  );
-                  const totalBudget =
-                    budget.budget_type === "absolute"
-                      ? budget.absolute_amount || 0
-                      : (budget.user1_amount || 0) + (budget.user2_amount || 0);
-                  const spent = budget.current_period_spent || 0;
-                  const remaining = totalBudget - spent;
-
-                  return (
-                    <div
-                      key={budget.category_id}
-                      className="border rounded-lg p-4 bg-white"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          {category?.image_url ? (
-                            <img
-                              src={category.image_url}
-                              alt={category.name}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                              <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-medium">{category?.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Sector: {sector?.name || "Unknown"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-                        <div>
-                          <p className="text-muted-foreground">Budget</p>
-                          <p className="font-medium">
-                            {formatCurrency(totalBudget)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Spent</p>
-                          <p className="text-muted-foreground">
-                            {formatCurrency(spent)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Remaining</p>
-                          <p
-                            className={
-                              remaining >= 0
-                                ? "text-green-600 font-medium"
-                                : "text-red-600 font-medium"
-                            }
-                          >
-                            {formatCurrency(remaining)}
-                          </p>
-                        </div>
-                      </div>
-                      {sector && (
-                        <div className="flex justify-center">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onCreateSectorBudget(sector)}
-                            className="w-full"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Create Sector Budget
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          );
-        })()}
       </div>
 
       {/* Orphaned Category Budgets Section */}

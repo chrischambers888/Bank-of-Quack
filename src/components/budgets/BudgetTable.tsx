@@ -486,7 +486,7 @@ export function BudgetTable({
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            onClick={() =>
+                                            onClick={() => {
                                               onEditBudget({
                                                 id: budgetSummary.budget_id!,
                                                 category_id:
@@ -501,8 +501,8 @@ export function BudgetTable({
                                                   budgetSummary.user1_amount,
                                                 user2_amount:
                                                   budgetSummary.user2_amount,
-                                              })
-                                            }
+                                              });
+                                            }}
                                             className="h-8 px-3"
                                           >
                                             <Edit className="h-3 w-3" />
