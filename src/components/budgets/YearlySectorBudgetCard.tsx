@@ -98,6 +98,7 @@ export function YearlySectorBudgetCard({
   const [sectorTransactions, setSectorTransactions] = useState<Transaction[]>(
     []
   );
+  const [isOnTrackExpanded, setIsOnTrackExpanded] = useState(false);
   const [userNames, setUserNames] = useState({
     user1: "User 1",
     user2: "User 2",
@@ -366,6 +367,36 @@ export function YearlySectorBudgetCard({
               Manual
             </Badge>
           )}
+          {/* On Track Dot Indicator */}
+          {(() => {
+            const budgetAmount = current_period_budget || 0;
+            const spent = current_period_spent || 0;
+            const onTrackData = calculateYearlyBudgetOnTrack(
+              budgetAmount,
+              spent,
+              selectedMonthForProgress
+            );
+
+            if (budgetAmount > 0) {
+              return (
+                <div className="flex items-center space-x-2 ml-auto">
+                  <span
+                    className={`text-xs font-medium ${
+                      onTrackData.isOnTrack ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    {onTrackData.isOnTrack ? "On Track" : "Over Budget"}
+                  </span>
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      onTrackData.isOnTrack ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  />
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -736,69 +767,82 @@ export function YearlySectorBudgetCard({
                       </div>
                     </div>
 
-                    {/* On Track Calculation */}
+                    {/* Expandable On Track Calculation */}
                     <div className="space-y-3">
-                      <div className="bg-white/5 rounded p-3 space-y-2">
-                        <div className="text-xs text-muted-foreground">
-                          On Track Calculation:
+                      <button
+                        onClick={() => setIsOnTrackExpanded(!isOnTrackExpanded)}
+                        className="flex items-center justify-between w-full p-3 bg-white/5 rounded hover:bg-white/10 transition-colors"
+                      >
+                        <span className="text-xs text-muted-foreground">
+                          On Track Calculation
+                        </span>
+                        {isOnTrackExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+
+                      {isOnTrackExpanded && (
+                        <div className="bg-white/5 rounded p-3 space-y-2">
+                          <div className="text-sm space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Daily Budget:
+                              </span>
+                              <span className="font-mono">
+                                {finalFormatCurrency(budgetAmount / 365)}/day
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Days Elapsed:
+                              </span>
+                              <span className="font-mono">
+                                {Math.floor(
+                                  (selectedMonthForProgress / 12) * 365
+                                )}{" "}
+                                days
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-t border-white/10 pt-1">
+                              <span className="text-muted-foreground">
+                                Implied Spend:
+                              </span>
+                              <span className="font-mono text-blue-400">
+                                {finalFormatCurrency(
+                                  onTrackData.shouldBeSpentByNow
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Actually Spent:
+                              </span>
+                              <span className="font-mono">
+                                {finalFormatCurrency(spent)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-t border-white/10 pt-1">
+                              <span className="text-muted-foreground">
+                                Difference:
+                              </span>
+                              <span
+                                className={`font-mono ${
+                                  onTrackData.isOnTrack
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {finalFormatCurrency(
+                                  Math.abs(onTrackData.difference)
+                                )}{" "}
+                                {onTrackData.isOnTrack ? "under" : "over"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-sm space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Daily Budget:
-                            </span>
-                            <span className="font-mono">
-                              {finalFormatCurrency(budgetAmount / 365)}/day
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Days Elapsed:
-                            </span>
-                            <span className="font-mono">
-                              {Math.floor(
-                                (selectedMonthForProgress / 12) * 365
-                              )}{" "}
-                              days
-                            </span>
-                          </div>
-                          <div className="flex justify-between border-t border-white/10 pt-1">
-                            <span className="text-muted-foreground">
-                              Implied Spend:
-                            </span>
-                            <span className="font-mono text-blue-400">
-                              {finalFormatCurrency(
-                                onTrackData.shouldBeSpentByNow
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Actually Spent:
-                            </span>
-                            <span className="font-mono">
-                              {finalFormatCurrency(spent)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between border-t border-white/10 pt-1">
-                            <span className="text-muted-foreground">
-                              Difference:
-                            </span>
-                            <span
-                              className={`font-mono ${
-                                onTrackData.isOnTrack
-                                  ? "text-green-400"
-                                  : "text-red-400"
-                              }`}
-                            >
-                              {finalFormatCurrency(
-                                Math.abs(onTrackData.difference)
-                              )}{" "}
-                              {onTrackData.isOnTrack ? "under" : "over"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 );
