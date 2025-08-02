@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,8 @@ import {
   Transaction,
 } from "@/types";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
+import { calculateYearlyBudgetOnTrack } from "./budgetUtils";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface YearlyBudgetModalProps {
   modalData: {
@@ -76,6 +78,7 @@ export function YearlyBudgetModal({
   categories,
 }: YearlyBudgetModalProps) {
   const { yellowThreshold } = useBudgetSettings();
+  const [isOnTrackExpanded, setIsOnTrackExpanded] = useState(false);
 
   if (!modalData) return null;
 
@@ -118,6 +121,254 @@ export function YearlyBudgetModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-6 pt-4">
+          {/* On Track Information */}
+          {(() => {
+            if (modalData.type === "sector") {
+              const sectorBudget = modalData.data.sectorBudget;
+              if (sectorBudget?.budget_id) {
+                const budgetAmount = sectorBudget.current_period_budget || 0;
+                const spent = sectorBudget.current_period_spent || 0;
+                const onTrackData = calculateYearlyBudgetOnTrack(
+                  budgetAmount,
+                  spent,
+                  selectedMonthForProgress
+                );
+
+                if (budgetAmount > 0) {
+                  return (
+                    <div className="bg-black/60 rounded-xl border shadow backdrop-blur-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium">
+                          On Track Status
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-4 h-4 rounded-full ${
+                              onTrackData.isOnTrack
+                                ? "bg-green-500"
+                                : "bg-red-500"
+                            }`}
+                          />
+                          <span
+                            className={`text-sm font-medium ${
+                              onTrackData.isOnTrack
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {onTrackData.isOnTrack ? "On Track" : "Behind"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expandable On Track Calculation */}
+                      <div className="space-y-3">
+                        <button
+                          onClick={() =>
+                            setIsOnTrackExpanded(!isOnTrackExpanded)
+                          }
+                          className="flex items-center justify-between w-full p-3 bg-black/40 rounded hover:bg-black/50 transition-colors"
+                        >
+                          <span className="text-xs text-muted-foreground">
+                            On Track Calculation
+                          </span>
+                          {isOnTrackExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+
+                        {isOnTrackExpanded && (
+                          <div className="bg-black/40 rounded p-3 space-y-2">
+                            <div className="text-sm space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Daily Budget:
+                                </span>
+                                <span className="font-mono">
+                                  {formatCurrency(budgetAmount / 365)}/day
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Days Elapsed:
+                                </span>
+                                <span className="font-mono">
+                                  {Math.floor(
+                                    (selectedMonthForProgress / 12) * 365
+                                  )}{" "}
+                                  days
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-t border-white/10 pt-1">
+                                <span className="text-muted-foreground">
+                                  Implied Spend:
+                                </span>
+                                <span className="font-mono text-blue-400">
+                                  {formatCurrency(
+                                    onTrackData.shouldBeSpentByNow
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Actually Spent:
+                                </span>
+                                <span className="font-mono">
+                                  {formatCurrency(spent)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-t border-white/10 pt-1">
+                                <span className="text-muted-foreground">
+                                  Difference:
+                                </span>
+                                <span
+                                  className={`font-mono ${
+                                    onTrackData.isOnTrack
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}
+                                >
+                                  {formatCurrency(
+                                    Math.abs(onTrackData.difference)
+                                  )}{" "}
+                                  {onTrackData.isOnTrack ? "under" : "over"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+              }
+            } else if (modalData.type === "category") {
+              const budget = modalData.data.budgetSummary;
+              if (budget?.budget_id) {
+                const budgetAmount = budget.current_period_budget || 0;
+                const spent = budget.current_period_spent || 0;
+                const onTrackData = calculateYearlyBudgetOnTrack(
+                  budgetAmount,
+                  spent,
+                  selectedMonthForProgress
+                );
+
+                if (budgetAmount > 0) {
+                  return (
+                    <div className="bg-black/60 rounded-xl border shadow backdrop-blur-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium">
+                          On Track Status
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-4 h-4 rounded-full ${
+                              onTrackData.isOnTrack
+                                ? "bg-green-500"
+                                : "bg-red-500"
+                            }`}
+                          />
+                          <span
+                            className={`text-sm font-medium ${
+                              onTrackData.isOnTrack
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {onTrackData.isOnTrack ? "On Track" : "Behind"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expandable On Track Calculation */}
+                      <div className="space-y-3">
+                        <button
+                          onClick={() =>
+                            setIsOnTrackExpanded(!isOnTrackExpanded)
+                          }
+                          className="flex items-center justify-between w-full p-3 bg-black/40 rounded hover:bg-black/50 transition-colors"
+                        >
+                          <span className="text-xs text-muted-foreground">
+                            On Track Calculation
+                          </span>
+                          {isOnTrackExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+
+                        {isOnTrackExpanded && (
+                          <div className="bg-black/40 rounded p-3 space-y-2">
+                            <div className="text-sm space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Daily Budget:
+                                </span>
+                                <span className="font-mono">
+                                  {formatCurrency(budgetAmount / 365)}/day
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Days Elapsed:
+                                </span>
+                                <span className="font-mono">
+                                  {Math.floor(
+                                    (selectedMonthForProgress / 12) * 365
+                                  )}{" "}
+                                  days
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-t border-white/10 pt-1">
+                                <span className="text-muted-foreground">
+                                  Implied Spend:
+                                </span>
+                                <span className="font-mono text-blue-400">
+                                  {formatCurrency(
+                                    onTrackData.shouldBeSpentByNow
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Actually Spent:
+                                </span>
+                                <span className="font-mono">
+                                  {formatCurrency(spent)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-t border-white/10 pt-1">
+                                <span className="text-muted-foreground">
+                                  Difference:
+                                </span>
+                                <span
+                                  className={`font-mono ${
+                                    onTrackData.isOnTrack
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}
+                                >
+                                  {formatCurrency(
+                                    Math.abs(onTrackData.difference)
+                                  )}{" "}
+                                  {onTrackData.isOnTrack ? "under" : "over"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+              }
+            }
+            return null;
+          })()}
+
           {/* Budget Card */}
           {modalData.type === "sector" ? (
             modalData.data.sectorBudget?.budget_id ? (
@@ -179,195 +430,6 @@ export function YearlyBudgetModal({
                 categories={categories}
                 exclusionType="yearly"
               />
-
-              {/* User Split Progress Bar for Category Budgets */}
-              {(() => {
-                const budget = modalData.data.budgetSummary;
-                const {
-                  current_period_user1_spent,
-                  current_period_user2_spent,
-                  budget_type,
-                  user1_amount,
-                  user2_amount,
-                } = budget;
-
-                // Only show if there's user spending data
-                if (
-                  (current_period_user1_spent || 0) > 0 ||
-                  (current_period_user2_spent || 0) > 0
-                ) {
-                  return (
-                    <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                      <h4 className="text-sm font-medium text-white mb-3">
-                        User Spending Breakdown - {selectedYear} (through{" "}
-                        {getMonthName(selectedMonthForProgress)})
-                      </h4>
-                      <div className="text-xs text-white/80 space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span>
-                            {userNames[0]}:{" "}
-                            {formatCurrency(current_period_user1_spent)}
-                            {budget_type === "split" &&
-                              ` / ${formatCurrency(user1_amount)}`}
-                          </span>
-                          <span>
-                            {userNames[1]}:{" "}
-                            {formatCurrency(current_period_user2_spent)}
-                            {budget_type === "split" &&
-                              ` / ${formatCurrency(user2_amount)}`}
-                          </span>
-                        </div>
-                        <div className="relative h-4 bg-gray-600 rounded-full overflow-hidden">
-                          {/* User 1 Progress */}
-                          <div
-                            className="absolute left-0 h-full transition-all duration-300"
-                            style={{
-                              width: `${
-                                ((current_period_user1_spent || 0) /
-                                  Math.max(
-                                    (current_period_user1_spent || 0) +
-                                      (current_period_user2_spent || 0),
-                                    1
-                                  )) *
-                                100
-                              }%`,
-                              backgroundColor:
-                                budget_type === "split"
-                                  ? // For split budgets, use color coding based on budget adherence
-                                    (budget.current_period_budget === 0 &&
-                                      (current_period_user1_spent || 0) > 0) ||
-                                    (current_period_user1_spent || 0) >=
-                                      (user1_amount || 0)
-                                    ? "rgb(239 68 68)"
-                                    : (current_period_user1_spent || 0) >=
-                                      ((user1_amount || 0) * yellowThreshold) /
-                                        100
-                                    ? "rgb(234 179 8)"
-                                    : "rgb(34 197 94)"
-                                  : // For absolute budgets, use neutral gray
-                                    "rgb(156 163 175)",
-                            }}
-                          />
-                          {/* User 2 Progress */}
-                          <div
-                            className="absolute right-0 h-full transition-all duration-300"
-                            style={{
-                              width: `${
-                                ((current_period_user2_spent || 0) /
-                                  Math.max(
-                                    (current_period_user1_spent || 0) +
-                                      (current_period_user2_spent || 0),
-                                    1
-                                  )) *
-                                100
-                              }%`,
-                              backgroundColor:
-                                budget_type === "split"
-                                  ? // For split budgets, use color coding based on budget adherence
-                                    (budget.current_period_budget === 0 &&
-                                      (current_period_user2_spent || 0) > 0) ||
-                                    (current_period_user2_spent || 0) >=
-                                      (user2_amount || 0)
-                                    ? "rgb(239 68 68)"
-                                    : (current_period_user2_spent || 0) >=
-                                      ((user2_amount || 0) * yellowThreshold) /
-                                        100
-                                    ? "rgb(234 179 8)"
-                                    : "rgb(34 197 94)"
-                                  : // For absolute budgets, use neutral gray
-                                    "rgb(156 163 175)",
-                            }}
-                          />
-                          {/* User 1 Avatar */}
-                          <div
-                            className="absolute top-1/2 flex items-center justify-center"
-                            style={{
-                              left: `calc(${
-                                ((current_period_user1_spent || 0) /
-                                  Math.max(
-                                    (current_period_user1_spent || 0) +
-                                      (current_period_user2_spent || 0),
-                                    1
-                                  )) *
-                                100
-                              }% / 2)`,
-                              transform: "translate(-50%, -50%)",
-                            }}
-                          >
-                            <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
-                              {user1AvatarUrl ? (
-                                <img
-                                  src={user1AvatarUrl}
-                                  alt={`${userNames[0]} avatar`}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-xs text-white font-bold">
-                                  {userNames[0].charAt(0).toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {/* User 2 Avatar */}
-                          <div
-                            className="absolute top-1/2 flex items-center justify-center"
-                            style={{
-                              left: `calc(${
-                                ((current_period_user1_spent || 0) /
-                                  Math.max(
-                                    (current_period_user1_spent || 0) +
-                                      (current_period_user2_spent || 0),
-                                    1
-                                  )) *
-                                100
-                              }% + (${
-                                ((current_period_user2_spent || 0) /
-                                  Math.max(
-                                    (current_period_user1_spent || 0) +
-                                      (current_period_user2_spent || 0),
-                                    1
-                                  )) *
-                                100
-                              }% / 2))`,
-                              transform: "translate(-50%, -50%)",
-                            }}
-                          >
-                            <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden border border-white/20">
-                              {user2AvatarUrl ? (
-                                <img
-                                  src={user2AvatarUrl}
-                                  alt={`${userNames[1]} avatar`}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-xs text-white font-bold">
-                                  {userNames[1].charAt(0).toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {/* Dividing Line */}
-                          <div
-                            className="absolute top-0 bottom-0 w-0.5 bg-white opacity-80"
-                            style={{
-                              left: `${
-                                ((current_period_user1_spent || 0) /
-                                  Math.max(
-                                    (current_period_user1_spent || 0) +
-                                      (current_period_user2_spent || 0),
-                                    1
-                                  )) *
-                                100
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
             </>
           ) : (
             <div className="text-center py-8">

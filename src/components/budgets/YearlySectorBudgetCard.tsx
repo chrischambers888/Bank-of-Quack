@@ -28,6 +28,7 @@ import { supabase } from "@/supabaseClient";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import TransactionList from "@/components/TransactionList";
 import { YearlyCategoryBudgetCard } from "./YearlyCategoryBudgetCard";
+import { calculateYearlyBudgetOnTrack } from "./budgetUtils";
 
 interface YearlySectorBudgetCardProps {
   sectorBudgetSummary: YearlySectorBudgetSummary;
@@ -698,6 +699,113 @@ export function YearlySectorBudgetCard({
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* On Track Information */}
+            {(() => {
+              const budgetAmount = getBudgetAmount();
+              const spent = current_period_spent || 0;
+              const onTrackData = calculateYearlyBudgetOnTrack(
+                budgetAmount,
+                spent,
+                selectedMonthForProgress
+              );
+
+              if (budgetAmount > 0) {
+                return (
+                  <div className="bg-white/10 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium">
+                        On Track Status
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`w-4 h-4 rounded-full ${
+                            onTrackData.isOnTrack
+                              ? "bg-green-500"
+                              : "bg-red-500"
+                          }`}
+                        />
+                        <span
+                          className={`text-sm font-medium ${
+                            onTrackData.isOnTrack
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {onTrackData.isOnTrack ? "On Track" : "Behind"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* On Track Calculation */}
+                    <div className="space-y-3">
+                      <div className="bg-white/5 rounded p-3 space-y-2">
+                        <div className="text-xs text-muted-foreground">
+                          On Track Calculation:
+                        </div>
+                        <div className="text-sm space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Daily Budget:
+                            </span>
+                            <span className="font-mono">
+                              {finalFormatCurrency(budgetAmount / 365)}/day
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Days Elapsed:
+                            </span>
+                            <span className="font-mono">
+                              {Math.floor(
+                                (selectedMonthForProgress / 12) * 365
+                              )}{" "}
+                              days
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-t border-white/10 pt-1">
+                            <span className="text-muted-foreground">
+                              Implied Spend:
+                            </span>
+                            <span className="font-mono text-blue-400">
+                              {finalFormatCurrency(
+                                onTrackData.shouldBeSpentByNow
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Actually Spent:
+                            </span>
+                            <span className="font-mono">
+                              {finalFormatCurrency(spent)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-t border-white/10 pt-1">
+                            <span className="text-muted-foreground">
+                              Difference:
+                            </span>
+                            <span
+                              className={`font-mono ${
+                                onTrackData.isOnTrack
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {finalFormatCurrency(
+                                Math.abs(onTrackData.difference)
+                              )}{" "}
+                              {onTrackData.isOnTrack ? "under" : "over"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {isLoadingTransactions ? (
               <div className="text-center py-8">
                 <div className="text-white/80">Loading transactions...</div>

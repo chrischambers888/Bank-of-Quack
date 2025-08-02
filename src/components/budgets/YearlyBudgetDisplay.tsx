@@ -42,6 +42,7 @@ import {
   getBudgetSummariesForSector,
   getYearlyBudgetStats,
   getExcludedYearlySectors,
+  calculateYearlyBudgetOnTrack,
 } from "./budgetUtils";
 import { BudgetStats } from "./BudgetStats";
 import { Badge } from "@/components/ui/badge";
@@ -460,6 +461,9 @@ export function YearlyBudgetDisplay({
                       Auto Rollup
                     </th>
                     <th className="text-center py-3 px-4 font-semibold">
+                      On Track
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold">
                       Actions
                     </th>
                   </tr>
@@ -686,6 +690,51 @@ export function YearlyBudgetDisplay({
                                       )}
                                     </div>
                                   </td>
+                                  <td className="text-center py-3 px-4">
+                                    {(() => {
+                                      const budgetAmount =
+                                        sectorBudget?.current_period_budget ||
+                                        0;
+                                      const spent =
+                                        sectorBudget?.current_period_spent || 0;
+                                      const onTrackData =
+                                        calculateYearlyBudgetOnTrack(
+                                          budgetAmount,
+                                          spent,
+                                          selectedMonthForProgress
+                                        );
+
+                                      if (budgetAmount > 0) {
+                                        return (
+                                          <div className="flex justify-center">
+                                            <div
+                                              className={`w-3 h-3 rounded-full ${
+                                                onTrackData.isOnTrack
+                                                  ? "bg-green-500"
+                                                  : "bg-red-500"
+                                              }`}
+                                              title={`${
+                                                onTrackData.isOnTrack
+                                                  ? "On track"
+                                                  : "Behind schedule"
+                                              }: ${formatCurrency(
+                                                Math.abs(onTrackData.difference)
+                                              )} ${
+                                                onTrackData.isOnTrack
+                                                  ? "ahead"
+                                                  : "behind"
+                                              }`}
+                                            />
+                                          </div>
+                                        );
+                                      }
+                                      return (
+                                        <span className="text-muted-foreground">
+                                          —
+                                        </span>
+                                      );
+                                    })()}
+                                  </td>
                                 </>
                               ) : (
                                 <>
@@ -887,6 +936,51 @@ export function YearlyBudgetDisplay({
                                               —
                                             </td>
                                             <td className="py-3 px-4 text-center">
+                                              {(() => {
+                                                const budgetAmount =
+                                                  totalBudget;
+                                                const spentAmount = spent;
+                                                const onTrackData =
+                                                  calculateYearlyBudgetOnTrack(
+                                                    budgetAmount,
+                                                    spentAmount,
+                                                    selectedMonthForProgress
+                                                  );
+
+                                                if (budgetAmount > 0) {
+                                                  return (
+                                                    <div className="flex justify-center">
+                                                      <div
+                                                        className={`w-3 h-3 rounded-full ${
+                                                          onTrackData.isOnTrack
+                                                            ? "bg-green-500"
+                                                            : "bg-red-500"
+                                                        }`}
+                                                        title={`${
+                                                          onTrackData.isOnTrack
+                                                            ? "On track"
+                                                            : "Behind schedule"
+                                                        }: ${formatCurrency(
+                                                          Math.abs(
+                                                            onTrackData.difference
+                                                          )
+                                                        )} ${
+                                                          onTrackData.isOnTrack
+                                                            ? "ahead"
+                                                            : "behind"
+                                                        }`}
+                                                      />
+                                                    </div>
+                                                  );
+                                                }
+                                                return (
+                                                  <span className="text-muted-foreground">
+                                                    —
+                                                  </span>
+                                                );
+                                              })()}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
                                               <div className="flex gap-2 justify-center">
                                                 <Button
                                                   variant="outline"
@@ -943,7 +1037,7 @@ export function YearlyBudgetDisplay({
 
                                   return (
                                     <tr className="bg-muted/20 border-t">
-                                      <td colSpan={7} className="py-4 px-4">
+                                      <td colSpan={8} className="py-4 px-4">
                                         <div className="flex justify-center">
                                           <div className="flex flex-wrap justify-center gap-2">
                                             {unsetCategories.map((category) => (

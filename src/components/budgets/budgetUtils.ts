@@ -273,4 +273,30 @@ export const getExcludedSectors = (sectors: Sector[], sectorBudgetSummaries: Sec
     // Exclude sectors that don't have budgets
     return !sectorBudget?.budget_id;
   });
-}; 
+};
+
+/**
+ * Calculates if a yearly budget is "on track" by comparing remaining budget
+ * to what should be spent by the current month
+ */
+export function calculateYearlyBudgetOnTrack(
+  totalBudget: number,
+  spent: number,
+  currentMonth: number
+): {
+  isOnTrack: boolean;
+  remainingBudget: number;
+  shouldBeSpentByNow: number;
+  difference: number;
+} {
+  const remainingBudget = totalBudget - spent;
+  const shouldBeSpentByNow = (totalBudget / 12) * currentMonth;
+  const difference = remainingBudget - (totalBudget - shouldBeSpentByNow);
+  
+  return {
+    isOnTrack: remainingBudget >= (totalBudget - shouldBeSpentByNow),
+    remainingBudget,
+    shouldBeSpentByNow,
+    difference
+  };
+} 
