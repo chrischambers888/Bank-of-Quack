@@ -705,22 +705,35 @@ export function YearlyBudgetDisplay({
                                         );
 
                                       if (budgetAmount > 0) {
+                                        // Determine status based on spending vs implied spend and actual budget
+                                        let statusText = "On Track";
+                                        let dotColor = "bg-green-500";
+                                        let tooltipText = "On track";
+
+                                        if (spent > budgetAmount) {
+                                          // Over the actual budget
+                                          statusText = "Over Budget";
+                                          dotColor = "bg-red-500";
+                                          tooltipText = "Over budget";
+                                        } else if (
+                                          spent > onTrackData.shouldBeSpentByNow
+                                        ) {
+                                          // Ahead of implied spend but not over budget
+                                          statusText = "Outpacing budget";
+                                          dotColor = "bg-yellow-500";
+                                          tooltipText = "Outpacing budget";
+                                        }
+                                        // else: on track (behind implied spend) - default values above
+
                                         return (
                                           <div className="flex justify-center">
                                             <div
-                                              className={`w-3 h-3 rounded-full ${
-                                                onTrackData.isOnTrack
-                                                  ? "bg-green-500"
-                                                  : "bg-red-500"
-                                              }`}
-                                              title={`${
-                                                onTrackData.isOnTrack
-                                                  ? "On track"
-                                                  : "Behind schedule"
-                                              }: ${formatCurrency(
+                                              className={`w-3 h-3 rounded-full ${dotColor}`}
+                                              title={`${tooltipText}: ${formatCurrency(
                                                 Math.abs(onTrackData.difference)
                                               )} ${
-                                                onTrackData.isOnTrack
+                                                spent >
+                                                onTrackData.shouldBeSpentByNow
                                                   ? "ahead"
                                                   : "behind"
                                               }`}
@@ -948,24 +961,40 @@ export function YearlyBudgetDisplay({
                                                   );
 
                                                 if (budgetAmount > 0) {
+                                                  // Determine status based on spending vs implied spend and actual budget
+                                                  let statusText = "On Track";
+                                                  let dotColor = "bg-green-500";
+                                                  let tooltipText = "On track";
+
+                                                  if (spent > budgetAmount) {
+                                                    // Over the actual budget
+                                                    statusText = "Over Budget";
+                                                    dotColor = "bg-red-500";
+                                                    tooltipText = "Over budget";
+                                                  } else if (
+                                                    spent >
+                                                    onTrackData.shouldBeSpentByNow
+                                                  ) {
+                                                    // Ahead of implied spend but not over budget
+                                                    statusText =
+                                                      "Outpacing budget";
+                                                    dotColor = "bg-yellow-500";
+                                                    tooltipText =
+                                                      "Outpacing budget";
+                                                  }
+                                                  // else: on track (behind implied spend) - default values above
+
                                                   return (
                                                     <div className="flex justify-center">
                                                       <div
-                                                        className={`w-3 h-3 rounded-full ${
-                                                          onTrackData.isOnTrack
-                                                            ? "bg-green-500"
-                                                            : "bg-red-500"
-                                                        }`}
-                                                        title={`${
-                                                          onTrackData.isOnTrack
-                                                            ? "On track"
-                                                            : "Behind schedule"
-                                                        }: ${formatCurrency(
+                                                        className={`w-3 h-3 rounded-full ${dotColor}`}
+                                                        title={`${tooltipText}: ${formatCurrency(
                                                           Math.abs(
                                                             onTrackData.difference
                                                           )
                                                         )} ${
-                                                          onTrackData.isOnTrack
+                                                          spent >
+                                                          onTrackData.shouldBeSpentByNow
                                                             ? "ahead"
                                                             : "behind"
                                                         }`}

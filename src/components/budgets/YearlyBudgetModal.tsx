@@ -142,22 +142,38 @@ export function YearlyBudgetModal({
                           On Track Status
                         </span>
                         <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-4 h-4 rounded-full ${
-                              onTrackData.isOnTrack
-                                ? "bg-green-500"
-                                : "bg-red-500"
-                            }`}
-                          />
-                          <span
-                            className={`text-sm font-medium ${
-                              onTrackData.isOnTrack
-                                ? "text-green-400"
-                                : "text-red-400"
-                            }`}
-                          >
-                            {onTrackData.isOnTrack ? "On Track" : "Behind"}
-                          </span>
+                          {(() => {
+                            // Determine status based on spending vs implied spend and actual budget
+                            let statusText = "On Track";
+                            let dotColor = "bg-green-500";
+                            let textColor = "text-green-400";
+
+                            if (spent > budgetAmount) {
+                              // Over the actual budget
+                              statusText = "Over Budget";
+                              dotColor = "bg-red-500";
+                              textColor = "text-red-400";
+                            } else if (spent > onTrackData.shouldBeSpentByNow) {
+                              // Ahead of implied spend but not over budget
+                              statusText = "Outpacing budget";
+                              dotColor = "bg-yellow-500";
+                              textColor = "text-yellow-400";
+                            }
+                            // else: on track (behind implied spend) - default values above
+
+                            return (
+                              <>
+                                <div
+                                  className={`w-4 h-4 rounded-full ${dotColor}`}
+                                />
+                                <span
+                                  className={`text-sm font-medium ${textColor}`}
+                                >
+                                  {statusText}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -225,15 +241,17 @@ export function YearlyBudgetModal({
                                 </span>
                                 <span
                                   className={`font-mono ${
-                                    onTrackData.isOnTrack
-                                      ? "text-green-400"
-                                      : "text-red-400"
+                                    spent > onTrackData.shouldBeSpentByNow
+                                      ? "text-red-400"
+                                      : "text-green-400"
                                   }`}
                                 >
                                   {formatCurrency(
                                     Math.abs(onTrackData.difference)
                                   )}{" "}
-                                  {onTrackData.isOnTrack ? "under" : "over"}
+                                  {spent > onTrackData.shouldBeSpentByNow
+                                    ? "over"
+                                    : "under"}
                                 </span>
                               </div>
                             </div>
@@ -263,22 +281,38 @@ export function YearlyBudgetModal({
                           On Track Status
                         </span>
                         <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-4 h-4 rounded-full ${
-                              onTrackData.isOnTrack
-                                ? "bg-green-500"
-                                : "bg-red-500"
-                            }`}
-                          />
-                          <span
-                            className={`text-sm font-medium ${
-                              onTrackData.isOnTrack
-                                ? "text-green-400"
-                                : "text-red-400"
-                            }`}
-                          >
-                            {onTrackData.isOnTrack ? "On Track" : "Behind"}
-                          </span>
+                          {(() => {
+                            // Determine status based on spending vs implied spend and actual budget
+                            let statusText = "On Track";
+                            let dotColor = "bg-green-500";
+                            let textColor = "text-green-400";
+
+                            if (spent > budgetAmount) {
+                              // Over the actual budget
+                              statusText = "Over Budget";
+                              dotColor = "bg-red-500";
+                              textColor = "text-red-400";
+                            } else if (spent > onTrackData.shouldBeSpentByNow) {
+                              // Ahead of implied spend but not over budget
+                              statusText = "Outpacing budget";
+                              dotColor = "bg-yellow-500";
+                              textColor = "text-yellow-400";
+                            }
+                            // else: on track (behind implied spend) - default values above
+
+                            return (
+                              <>
+                                <div
+                                  className={`w-4 h-4 rounded-full ${dotColor}`}
+                                />
+                                <span
+                                  className={`text-sm font-medium ${textColor}`}
+                                >
+                                  {statusText}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -346,15 +380,17 @@ export function YearlyBudgetModal({
                                 </span>
                                 <span
                                   className={`font-mono ${
-                                    onTrackData.isOnTrack
-                                      ? "text-green-400"
-                                      : "text-red-400"
+                                    spent > onTrackData.shouldBeSpentByNow
+                                      ? "text-red-400"
+                                      : "text-green-400"
                                   }`}
                                 >
                                   {formatCurrency(
                                     Math.abs(onTrackData.difference)
                                   )}{" "}
-                                  {onTrackData.isOnTrack ? "under" : "over"}
+                                  {spent > onTrackData.shouldBeSpentByNow
+                                    ? "over"
+                                    : "under"}
                                 </span>
                               </div>
                             </div>

@@ -378,20 +378,33 @@ export function YearlySectorBudgetCard({
             );
 
             if (budgetAmount > 0) {
+              // Determine status based on spending vs implied spend and actual budget
+              let status = "on-track";
+              let statusText = "On Track";
+              let textColor = "text-green-400";
+              let dotColor = "bg-green-500";
+
+              if (spent > budgetAmount) {
+                // Over the actual budget
+                status = "over-budget";
+                statusText = "Over Budget";
+                textColor = "text-red-400";
+                dotColor = "bg-red-500";
+              } else if (spent > onTrackData.shouldBeSpentByNow) {
+                // Ahead of implied spend but not over budget
+                status = "ahead-schedule";
+                statusText = "Outpacing budget";
+                textColor = "text-yellow-400";
+                dotColor = "bg-yellow-500";
+              }
+              // else: on track (behind implied spend) - default values above
+
               return (
                 <div className="flex items-center space-x-2 ml-auto">
-                  <span
-                    className={`text-xs font-medium ${
-                      onTrackData.isOnTrack ? "text-green-400" : "text-red-400"
-                    }`}
-                  >
-                    {onTrackData.isOnTrack ? "On Track" : "Over Budget"}
+                  <span className={`text-xs font-medium ${textColor}`}>
+                    {statusText}
                   </span>
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      onTrackData.isOnTrack ? "bg-green-500" : "bg-red-500"
-                    }`}
-                  />
+                  <div className={`w-3 h-3 rounded-full ${dotColor}`} />
                 </div>
               );
             }
