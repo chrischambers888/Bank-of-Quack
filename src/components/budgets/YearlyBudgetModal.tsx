@@ -18,6 +18,10 @@ import {
 } from "@/types";
 import { useBudgetSettings } from "@/hooks/useBudgetSettings";
 import { calculateYearlyBudgetOnTrack } from "./budgetUtils";
+import {
+  calculateYearlyCategorySpentPreviousMonths,
+  calculateYearlySectorSpentPreviousMonths,
+} from "@/utils/budgetCalculations";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface YearlyBudgetModalProps {
@@ -258,6 +262,53 @@ export function YearlyBudgetModal({
                           </div>
                         )}
                       </div>
+
+                      {/* Monthly Spend Needed - Always Visible */}
+                      {(() => {
+                        // Calculate spent for previous months only (excluding current month)
+                        const previousMonthsSpent =
+                          calculateYearlySectorSpentPreviousMonths(
+                            modalData.data.sector.category_ids,
+                            selectedYear,
+                            selectedMonthForProgress,
+                            allTransactions
+                          );
+
+                        const remainingBudget =
+                          budgetAmount - previousMonthsSpent;
+                        const remainingMonths =
+                          12 - (selectedMonthForProgress - 1); // Include current month
+
+                        // If already over budget, show N/A
+                        if (previousMonthsSpent > budgetAmount) {
+                          return (
+                            <div className="flex justify-between border-t border-white/10 pt-3 mt-3">
+                              <span className="text-sm text-muted-foreground">
+                                Monthly Spend Needed:
+                              </span>
+                              <span className="text-sm font-mono text-muted-foreground">
+                                N/A
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        const monthlySpendNeeded =
+                          remainingMonths > 0
+                            ? remainingBudget / remainingMonths
+                            : 0;
+
+                        return (
+                          <div className="flex justify-between border-t border-white/10 pt-3 mt-3">
+                            <span className="text-sm text-muted-foreground">
+                              Monthly Spend Needed:
+                            </span>
+                            <span className="text-sm font-mono text-blue-400">
+                              {formatCurrency(monthlySpendNeeded)}/month
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 }
@@ -397,6 +448,53 @@ export function YearlyBudgetModal({
                           </div>
                         )}
                       </div>
+
+                      {/* Monthly Spend Needed - Always Visible */}
+                      {(() => {
+                        // Calculate spent for previous months only (excluding current month)
+                        const previousMonthsSpent =
+                          calculateYearlyCategorySpentPreviousMonths(
+                            modalData.data.category.id,
+                            selectedYear,
+                            selectedMonthForProgress,
+                            allTransactions
+                          );
+
+                        const remainingBudget =
+                          budgetAmount - previousMonthsSpent;
+                        const remainingMonths =
+                          12 - (selectedMonthForProgress - 1); // Include current month
+
+                        // If already over budget, show N/A
+                        if (previousMonthsSpent > budgetAmount) {
+                          return (
+                            <div className="flex justify-between border-t border-white/10 pt-3 mt-3">
+                              <span className="text-sm text-muted-foreground">
+                                Monthly Spend Needed:
+                              </span>
+                              <span className="text-sm font-mono text-muted-foreground">
+                                N/A
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        const monthlySpendNeeded =
+                          remainingMonths > 0
+                            ? remainingBudget / remainingMonths
+                            : 0;
+
+                        return (
+                          <div className="flex justify-between border-t border-white/10 pt-3 mt-3">
+                            <span className="text-sm text-muted-foreground">
+                              Monthly Spend Needed:
+                            </span>
+                            <span className="text-sm font-mono text-blue-400">
+                              {formatCurrency(monthlySpendNeeded)}/month
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 }

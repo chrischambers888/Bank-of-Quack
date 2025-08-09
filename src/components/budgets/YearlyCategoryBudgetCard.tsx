@@ -535,28 +535,44 @@ export function YearlyCategoryBudgetCard({
 
               if (budgetAmount > 0) {
                 return (
-                  <div className="bg-white/10 rounded-lg p-4">
+                  <div className="bg-black/60 rounded-xl border shadow backdrop-blur-sm p-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium">
                         On Track Status
                       </span>
                       <div className="flex items-center space-x-2">
-                        <div
-                          className={`w-4 h-4 rounded-full ${
-                            onTrackData.isOnTrack
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                          }`}
-                        />
-                        <span
-                          className={`text-sm font-medium ${
-                            onTrackData.isOnTrack
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {onTrackData.isOnTrack ? "On Track" : "Behind"}
-                        </span>
+                        {(() => {
+                          // Determine status based on spending vs implied spend and actual budget
+                          let statusText = "On Track";
+                          let dotColor = "bg-green-500";
+                          let textColor = "text-green-400";
+
+                          if (spent > budgetAmount) {
+                            // Over the actual budget
+                            statusText = "Over Budget";
+                            dotColor = "bg-red-500";
+                            textColor = "text-red-400";
+                          } else if (spent > onTrackData.shouldBeSpentByNow) {
+                            // Ahead of implied spend but not over budget
+                            statusText = "Outpacing budget";
+                            dotColor = "bg-yellow-500";
+                            textColor = "text-yellow-400";
+                          }
+                          // else: on track (behind implied spend) - default values above
+
+                          return (
+                            <>
+                              <div
+                                className={`w-4 h-4 rounded-full ${dotColor}`}
+                              />
+                              <span
+                                className={`text-sm font-medium ${textColor}`}
+                              >
+                                {statusText}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -564,7 +580,7 @@ export function YearlyCategoryBudgetCard({
                     <div className="space-y-3">
                       <button
                         onClick={() => setIsOnTrackExpanded(!isOnTrackExpanded)}
-                        className="flex items-center justify-between w-full p-3 bg-white/5 rounded hover:bg-white/10 transition-colors"
+                        className="flex items-center justify-between w-full p-3 bg-black/40 rounded hover:bg-black/50 transition-colors"
                       >
                         <span className="text-xs text-muted-foreground">
                           On Track Calculation
@@ -577,7 +593,7 @@ export function YearlyCategoryBudgetCard({
                       </button>
 
                       {isOnTrackExpanded && (
-                        <div className="bg-white/5 rounded p-3 space-y-2">
+                        <div className="bg-black/40 rounded p-3 space-y-2">
                           <div className="text-sm space-y-1">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">
@@ -622,21 +638,60 @@ export function YearlyCategoryBudgetCard({
                               </span>
                               <span
                                 className={`font-mono ${
-                                  onTrackData.isOnTrack
-                                    ? "text-green-400"
-                                    : "text-red-400"
+                                  spent > onTrackData.shouldBeSpentByNow
+                                    ? "text-red-400"
+                                    : "text-green-400"
                                 }`}
                               >
                                 {finalFormatCurrency(
                                   Math.abs(onTrackData.difference)
                                 )}{" "}
-                                {onTrackData.isOnTrack ? "under" : "over"}
+                                {spent > onTrackData.shouldBeSpentByNow
+                                  ? "over"
+                                  : "under"}
                               </span>
                             </div>
                           </div>
                         </div>
                       )}
                     </div>
+
+                    {/* Monthly Spend Needed - Always Visible */}
+                    {(() => {
+                      const remainingBudget = budgetAmount - spent;
+                      const remainingMonths = 12 - selectedMonthForProgress;
+
+                      // If already over budget, show N/A
+                      if (spent > budgetAmount) {
+                        return (
+                          <div className="flex justify-between border-t border-white/10 pt-3 mt-3">
+                            <span className="text-sm text-muted-foreground">
+                              Monthly Spend Needed:
+                            </span>
+                            <span className="text-sm font-mono text-muted-foreground">
+                              N/A
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      const monthlySpendNeeded =
+                        remainingMonths > 0
+                          ? remainingBudget / remainingMonths
+                          : 0;
+
+                      return (
+                        <div className="flex justify-between border-t border-white/10 pt-3 mt-3">
+                          <span className="text-sm text-muted-foreground">
+                            Monthly Spend Needed:
+                          </span>
+                          <span className="text-sm font-mono text-blue-400">
+                            {finalFormatCurrency(monthlySpendNeeded)}
+                            /month
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               }
