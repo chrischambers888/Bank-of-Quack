@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "./supabaseClient";
 import { Menu } from "lucide-react";
 import { useAppData } from "./hooks/useAppData";
+import { useTransactionTemplates } from "./hooks/useTransactionTemplates";
 import MobileMenu from "./components/ui/MobileMenu";
 import DuckFabNav from "./components/dashboard/DuckFabNav";
 
@@ -23,6 +24,7 @@ const navLinks = [
 
 const App: React.FC = () => {
   const appData = useAppData();
+  const { templates } = useTransactionTemplates();
   const navigate = useNavigate();
   const location = useLocation();
   const [authChecked, setAuthChecked] = useState(false);
@@ -118,6 +120,7 @@ const App: React.FC = () => {
         <Outlet
           context={{
             ...appData,
+            templates,
             editingTransaction,
             handleSetEditingTransaction,
             fabOpen,

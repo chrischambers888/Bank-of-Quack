@@ -25,13 +25,21 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Transaction, Category } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Transaction, Category, TransactionTemplate } from "@/types";
 import { formatMoney } from "@/lib/utils";
+import { FileText } from "lucide-react";
 
 interface TransactionFormProps {
   userNames: string[];
   categories: Category[];
   transactions: Transaction[];
+  templates: TransactionTemplate[];
   editingTransaction: Transaction | null;
   addTransaction: (t: Partial<Transaction>) => void;
   updateTransaction: (t: Partial<Transaction>) => void;
@@ -53,6 +61,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   userNames,
   categories,
   transactions,
+  templates,
   editingTransaction,
   addTransaction,
   updateTransaction,
@@ -73,6 +82,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [splitType, setSplitType] = useState<string>("");
   const [selectedReimbursesTransactionId, setSelectedReimbursesTransactionId] =
     useState<string>("none");
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [templateFilledFields, setTemplateFilledFields] = useState<Set<string>>(
+    new Set()
+  );
 
   const isEditing = !!editingTransaction;
   const lastEditIdRef = useRef<string | null>(null);
@@ -179,6 +192,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       setSelectedCategoryId("");
       setSplitType("");
       setPaidToUserName("");
+      setTemplateFilledFields(new Set());
     }
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -200,6 +214,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     setPaidToUserName("");
     setSplitType("");
     setSelectedReimbursesTransactionId("none");
+    setTemplateFilledFields(new Set());
     handleSetEditingTransaction(null);
   };
 
@@ -290,13 +305,104 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     navigate("/");
   };
 
+  const resetFormToDefaults = () => {
+    setId(null);
+    setTransactionType("expense");
+    setDate(new Date());
+    setDescription("");
+    setAmount("");
+    setSelectedCategoryId("");
+    setPaidOrReceivedBy("");
+    setPaidToUserName("");
+    setSplitType("");
+    setSelectedReimbursesTransactionId("none");
+    setTemplateFilledFields(new Set());
+  };
+
+  const applyTemplate = (template: TransactionTemplate) => {
+    // Reset all fields first
+    resetFormToDefaults();
+
+    // Track which fields are being filled by template
+    const filledFields = new Set<string>();
+
+    // Apply template fields
+    setTransactionType(template.transaction_type);
+    filledFields.add("transaction_type");
+    
+    setDescription(template.description);
+    filledFields.add("description");
+    
+    setAmount(template.amount.toString());
+    filledFields.add("amount");
+
+    if (template.paid_by_user_name) {
+      setPaidOrReceivedBy(template.paid_by_user_name);
+      filledFields.add("paid_by_user_name");
+    }
+
+    if (template.transaction_type === "expense") {
+      if (template.category_id) {
+        setSelectedCategoryId(template.category_id);
+        filledFields.add("category_id");
+      }
+      if (template.split_type) {
+        setSplitType(template.split_type);
+        filledFields.add("split_type");
+      }
+    } else if (template.transaction_type === "settlement") {
+      if (template.paid_to_user_name) {
+        setPaidToUserName(template.paid_to_user_name);
+        filledFields.add("paid_to_user_name");
+      }
+    } else if (
+      template.transaction_type === "income" ||
+      template.transaction_type === "reimbursement"
+    ) {
+      if (template.paid_to_user_name) {
+        setPaidOrReceivedBy(template.paid_to_user_name);
+        filledFields.add("paid_to_user_name");
+      }
+    }
+
+    setTemplateFilledFields(filledFields);
+    setIsTemplateDialogOpen(false);
+  };
+
+  // Clear template highlighting when user edits a field
+  const handleFieldChange = (
+    fieldName: string,
+    value: string | Date | undefined
+  ) => {
+    setTemplateFilledFields((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(fieldName);
+      return newSet;
+    });
+  };
+
   return (
-    <Card className="max-w-2xl mx-auto bg-transparent border-none shadow-none text-white">
-      <CardHeader>
-        <CardTitle className="text-3xl font-bold text-center">
-          {isEditing ? "Edit Transaction" : "New Transaction"}
-        </CardTitle>
-      </CardHeader>
+    <>
+      <Card className="max-w-2xl mx-auto bg-transparent border-none shadow-none text-white">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-3xl font-bold text-center flex-1">
+              {isEditing ? "Edit Transaction" : "New Transaction"}
+            </CardTitle>
+            {!isEditing && templates.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTemplateDialogOpen(true)}
+                className="ml-4 bg-white/10 hover:bg-white/20"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Use Template
+              </Button>
+            )}
+          </div>
+        </CardHeader>
       <CardContent className="pb-24">
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Transaction Type */}
@@ -304,9 +410,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             type="single"
             value={transactionType}
             onValueChange={(value: string) => {
-              if (value) setTransactionType(value);
+              if (value) {
+                handleFieldChange("transaction_type", value);
+                setTransactionType(value);
+              }
             }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-2"
+            className={cn(
+              "grid grid-cols-2 md:grid-cols-4 gap-2",
+              templateFilledFields.has("transaction_type") && "ring-2 ring-yellow-400 rounded-lg p-1"
+            )}
             disabled={isEditing}
           >
             {TRANSACTION_TYPES.map((type) => (
@@ -354,9 +466,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 id="description"
                 placeholder="e.g., Groceries from Walmart"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  handleFieldChange("description", e.target.value);
+                  setDescription(e.target.value);
+                }}
                 required
-                className="bg-white/10"
+                className={cn(
+                  "bg-white/10",
+                  templateFilledFields.has("description") && "bg-yellow-400/20 border-yellow-400"
+                )}
               />
             </div>
           </div>
@@ -372,11 +490,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               inputMode="decimal"
               placeholder="0.00"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                handleFieldChange("amount", e.target.value);
+                setAmount(e.target.value);
+              }}
               required
               min="0"
               step="0.01"
-              className="text-5xl font-bold text-center h-auto bg-transparent border-x-0 border-t-0 border-b-2 border-white/50 focus:ring-0 focus:border-yellow-400 transition-colors"
+              className={cn(
+                "text-5xl font-bold text-center h-auto bg-transparent border-x-0 border-t-0 border-b-2 border-white/50 focus:ring-0 focus:border-yellow-400 transition-colors",
+                templateFilledFields.has("amount") && "bg-yellow-400/20 border-yellow-400"
+              )}
             />
           </div>
 
@@ -390,9 +514,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             </Label>
             <Select
               value={paidOrReceivedBy}
-              onValueChange={setPaidOrReceivedBy}
+              onValueChange={(value) => {
+                handleFieldChange("paid_by_user_name", value);
+                setPaidOrReceivedBy(value);
+              }}
             >
-              <SelectTrigger id="paid-by" className="bg-white/10">
+              <SelectTrigger
+                id="paid-by"
+                className={cn(
+                  "bg-white/10",
+                  (templateFilledFields.has("paid_by_user_name") || templateFilledFields.has("paid_to_user_name")) && "bg-yellow-400/20 border-yellow-400"
+                )}
+              >
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
@@ -417,9 +550,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={selectedCategoryId}
-                  onValueChange={setSelectedCategoryId}
+                  onValueChange={(value) => {
+                    handleFieldChange("category_id", value);
+                    setSelectedCategoryId(value);
+                  }}
                 >
-                  <SelectTrigger id="category" className="bg-white/10">
+                  <SelectTrigger
+                    id="category"
+                    className={cn(
+                      "bg-white/10",
+                      templateFilledFields.has("category_id") && "bg-yellow-400/20 border-yellow-400"
+                    )}
+                  >
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -442,8 +584,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="split-type">Split Type</Label>
-                <Select value={splitType} onValueChange={setSplitType}>
-                  <SelectTrigger id="split-type" className="bg-white/10">
+                <Select
+                  value={splitType}
+                  onValueChange={(value) => {
+                    handleFieldChange("split_type", value);
+                    setSplitType(value);
+                  }}
+                >
+                  <SelectTrigger
+                    id="split-type"
+                    className={cn(
+                      "bg-white/10",
+                      templateFilledFields.has("split_type") && "bg-yellow-400/20 border-yellow-400"
+                    )}
+                  >
                     <SelectValue placeholder="Select split type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -461,8 +615,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           {transactionType === "settlement" && (
             <div className="space-y-2">
               <Label htmlFor="paid-to">Paid to</Label>
-              <Select value={paidToUserName} onValueChange={setPaidToUserName}>
-                <SelectTrigger id="paid-to" className="bg-white/10">
+              <Select
+                value={paidToUserName}
+                onValueChange={(value) => {
+                  handleFieldChange("paid_to_user_name", value);
+                  setPaidToUserName(value);
+                }}
+              >
+                <SelectTrigger
+                  id="paid-to"
+                  className={cn(
+                    "bg-white/10",
+                    templateFilledFields.has("paid_to_user_name") && "bg-yellow-400/20 border-yellow-400"
+                  )}
+                >
                   <SelectValue placeholder="Select user" />
                 </SelectTrigger>
                 <SelectContent>
@@ -523,6 +689,44 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         </form>
       </CardContent>
     </Card>
+
+    {/* Template Selector Dialog */}
+    <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Select a Template</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          {templates.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4">
+              No templates available. Create one in Settings.
+            </p>
+          ) : (
+            templates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => applyTemplate(template)}
+                className="w-full text-left p-3 rounded-lg border hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-semibold">{template.template_name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {template.description}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {formatMoney(template.amount)} • {template.transaction_type}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

@@ -3,12 +3,13 @@ import React from "react"; // Added React import for clarity, though often impli
 import { useOutletContext, useParams } from "react-router-dom";
 import TransactionForm from "../components/TransactionForm";
 import DuckFabNav from "@/components/dashboard/DuckFabNav";
-import { Transaction, Category } from "@/types";
+import { Transaction, Category, TransactionTemplate } from "@/types";
 
 interface TransactionsPageContext {
   userNames: string[];
   categories: Category[];
   transactions: Transaction[];
+  templates: TransactionTemplate[];
   editingTransaction: Transaction | null;
   addTransaction: (t: Partial<Transaction>) => void;
   updateTransaction: (t: Partial<Transaction>) => void;
@@ -74,6 +75,7 @@ const TransactionsPage: React.FC = () => {
             userNames={context.userNames}
             categories={context.categories}
             transactions={context.transactions}
+            templates={context.templates || []}
             editingTransaction={context.editingTransaction}
             addTransaction={context.addTransaction}
             updateTransaction={context.updateTransaction}

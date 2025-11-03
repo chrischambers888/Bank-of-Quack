@@ -25,6 +25,21 @@ export interface Category {
   image_url?: string;
 }
 
+export interface TransactionTemplate {
+  id: string;
+  user_id: string;
+  template_name: string;
+  transaction_type: string;
+  description: string;
+  amount: number;
+  paid_by_user_name?: string | null;
+  paid_to_user_name?: string | null;
+  category_id?: string | null;
+  split_type?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Sector {
   id: string;
   name: string;

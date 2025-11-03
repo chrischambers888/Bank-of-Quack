@@ -11,6 +11,7 @@ import CategorySettings from "@/components/settings/CategorySettings";
 import SectorSettings from "@/components/settings/SectorSettings";
 import SectorCategoryManagement from "@/components/settings/SectorCategoryManagement";
 import TransactionManagement from "@/components/settings/TransactionManagement";
+import TransactionTemplatesSettings from "@/components/settings/TransactionTemplatesSettings";
 import { BudgetSettings } from "@/components/settings/BudgetSettings";
 import ImportDialog from "@/components/settings/ImportDialog";
 
@@ -231,6 +232,11 @@ const SettingsPage = () => {
         />
 
         <BudgetSettings />
+
+        <TransactionTemplatesSettings
+          userNames={userNames}
+          categories={categories}
+        />
 
         <TransactionManagement
           transactions={transactions}
