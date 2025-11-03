@@ -21,6 +21,7 @@ import { formatMoney } from "@/lib/utils";
 interface TransactionTemplatesSettingsProps {
   userNames: string[];
   categories: Category[];
+  onTemplatesChange?: () => Promise<void>;
 }
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
@@ -32,7 +33,7 @@ const TRANSACTION_TYPE_LABELS: Record<string, string> = {
 
 const TransactionTemplatesSettings: React.FC<
   TransactionTemplatesSettingsProps
-> = ({ userNames, categories }) => {
+> = ({ userNames, categories, onTemplatesChange }) => {
   const {
     templates,
     loading,
@@ -49,12 +50,18 @@ const TransactionTemplatesSettings: React.FC<
 
   const handleCreateTemplate = async (template: Partial<TransactionTemplate>) => {
     await createTemplate(template);
+    if (onTemplatesChange) {
+      await onTemplatesChange();
+    }
   };
 
   const handleUpdateTemplate = async (template: Partial<TransactionTemplate>) => {
     if (!editingTemplate) return;
     await updateTemplate(editingTemplate.id, template);
     setEditingTemplate(null);
+    if (onTemplatesChange) {
+      await onTemplatesChange();
+    }
   };
 
   const handleEditClick = (template: TransactionTemplate) => {
@@ -67,11 +74,14 @@ const TransactionTemplatesSettings: React.FC<
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (templateToDelete) {
-      deleteTemplate(templateToDelete.id);
+      await deleteTemplate(templateToDelete.id);
       setTemplateToDelete(null);
       setDeleteDialogOpen(false);
+      if (onTemplatesChange) {
+        await onTemplatesChange();
+      }
     }
   };
 

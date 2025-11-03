@@ -45,6 +45,7 @@ interface SettingsPageContext {
   updateSector?: any;
   transactions: Transaction[];
   setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  fetchTemplates?: () => Promise<void>;
 }
 
 const SettingsPage = () => {
@@ -236,6 +237,7 @@ const SettingsPage = () => {
         <TransactionTemplatesSettings
           userNames={userNames}
           categories={categories}
+          onTemplatesChange={context.fetchTemplates}
         />
 
         <TransactionManagement

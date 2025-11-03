@@ -24,7 +24,7 @@ const navLinks = [
 
 const App: React.FC = () => {
   const appData = useAppData();
-  const { templates } = useTransactionTemplates();
+  const { templates, fetchTemplates } = useTransactionTemplates();
   const navigate = useNavigate();
   const location = useLocation();
   const [authChecked, setAuthChecked] = useState(false);
@@ -121,6 +121,7 @@ const App: React.FC = () => {
           context={{
             ...appData,
             templates,
+            fetchTemplates,
             editingTransaction,
             handleSetEditingTransaction,
             fabOpen,

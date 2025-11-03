@@ -692,13 +692,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
     {/* Template Selector Dialog */}
     <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md bg-[#004D40] border-[#26A69A] text-white">
         <DialogHeader>
-          <DialogTitle>Select a Template</DialogTitle>
+          <DialogTitle className="text-white">Select a Template</DialogTitle>
         </DialogHeader>
         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
           {templates.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-4">
+            <p className="text-white/70 text-sm py-4">
               No templates available. Create one in Settings.
             </p>
           ) : (
@@ -707,15 +707,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 key={template.id}
                 type="button"
                 onClick={() => applyTemplate(template)}
-                className="w-full text-left p-3 rounded-lg border hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="w-full text-left p-3 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="font-semibold">{template.template_name}</div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="font-semibold text-white">{template.template_name}</div>
+                    <div className="text-sm text-white/80 mt-1">
                       {template.description}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-white/60 mt-1">
                       {formatMoney(template.amount)} • {template.transaction_type}
                     </div>
                   </div>
