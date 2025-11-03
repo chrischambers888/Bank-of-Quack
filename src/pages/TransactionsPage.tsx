@@ -35,6 +35,9 @@ const TransactionsPage: React.FC = () => {
       if (transaction) {
         context.handleSetEditingTransaction(transaction);
       }
+    } else if (!transactionId && context.handleSetEditingTransaction) {
+      // Clear editing transaction when navigating to /transactions without an ID (creating new transaction)
+      context.handleSetEditingTransaction(null);
     }
   }, [
     transactionId,

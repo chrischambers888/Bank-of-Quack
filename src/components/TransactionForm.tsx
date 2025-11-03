@@ -167,6 +167,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         }
       }, 100);
     } else if (!isEditing && categories.length > 0 && userNames.length > 0) {
+      // Reset form when not editing (creating new transaction)
       lastEditIdRef.current = null;
       setId(null);
       setTransactionType("expense");
@@ -275,9 +276,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
     if (isEditing) {
       updateTransaction({ ...transactionDataPayload, id: id! });
+      resetFormAndState();
       navigate("/");
     } else {
       addTransaction(transactionDataPayload);
+      resetFormAndState();
       navigate("/");
     }
   };
