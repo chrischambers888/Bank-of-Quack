@@ -1,5 +1,6 @@
 // supabase/functions/create-plaid-link-token/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { Configuration, PlaidApi, PlaidEnvironments, LinkTokenCreateRequest, CountryCode, Products } from 'https://esm.sh/plaid@25.0.0'
 
 const corsHeaders = {
@@ -27,14 +28,29 @@ serve(async (req) => {
     })
     const plaidClient = new PlaidApi(configuration)
 
-    // Get user ID from auth header if available (optional for link token creation)
+    // Get user ID from auth header
     const authHeader = req.headers.get('Authorization')
     let userId = 'user_' + Date.now() // Default fallback
     
     if (authHeader) {
-      // Extract user ID from JWT token if needed
-      // For now, we'll use a timestamp-based ID
-      userId = 'user_' + Date.now()
+      // Extract user ID from JWT token
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          {
+            global: {
+              headers: { Authorization: authHeader },
+            },
+          }
+        )
+        const { data: { user } } = await supabaseClient.auth.getUser()
+        if (user) {
+          userId = user.id
+        }
+      } catch (e) {
+        console.warn('Could not get user from token:', e)
+      }
     }
 
     // Create link token request
@@ -46,6 +62,8 @@ serve(async (req) => {
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
+      // Add additional configuration for phone number handling
+      additional_consented_products: [Products.Auth, Products.Identity],
     }
 
     // Generate link token
