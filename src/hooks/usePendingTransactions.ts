@@ -5,6 +5,7 @@ import { PendingTransaction, Transaction } from "@/types";
 
 export const usePendingTransactions = () => {
   const [pendingTransactions, setPendingTransactions] = useState<PendingTransaction[]>([]);
+  const [processedTransactions, setProcessedTransactions] = useState<PendingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,8 +14,8 @@ export const usePendingTransactions = () => {
       setLoading(true);
       setError(null);
       
-      // Join with connected_accounts to get account info and join with categories
-      const { data, error: fetchError } = await supabase
+      // Fetch pending transactions
+      const { data: pendingData, error: pendingError } = await supabase
         .from("pending_transactions")
         .select(`
           *,
@@ -33,15 +34,43 @@ export const usePendingTransactions = () => {
         .order("date", { ascending: false })
         .order("created_at", { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (pendingError) throw pendingError;
+
+      // Fetch approved/rejected transactions
+      const { data: processedData, error: processedError } = await supabase
+        .from("pending_transactions")
+        .select(`
+          *,
+          connected_accounts!inner (
+            id,
+            account_name,
+            institution_name,
+            account_last_four
+          ),
+          categories (
+            id,
+            name
+          )
+        `)
+        .in("status", ["approved", "rejected"])
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (processedError) throw processedError;
 
       // Transform the data to include category_name
-      const transformed = (data || []).map((pt: any) => ({
+      const transformedPending = (pendingData || []).map((pt: any) => ({
         ...pt,
         category_name: pt.categories?.name || null,
       }));
 
-      setPendingTransactions(transformed);
+      const transformedProcessed = (processedData || []).map((pt: any) => ({
+        ...pt,
+        category_name: pt.categories?.name || null,
+      }));
+
+      setPendingTransactions(transformedPending);
+      setProcessedTransactions(transformedProcessed);
     } catch (err: any) {
       console.error("Error fetching pending transactions:", err);
       setError(err.message);
@@ -107,10 +136,23 @@ export const usePendingTransactions = () => {
 
         if (updateError) throw updateError;
 
-        // 4. Refresh pending transactions list
+        // 4. Fetch the complete transaction from transactions_view (includes category_name, etc.)
+        const { data: completeTransaction, error: fetchCompleteError } = await supabase
+          .from("transactions_view")
+          .select("*")
+          .eq("id", newTransaction.id)
+          .single();
+
+        if (fetchCompleteError) {
+          console.error("Error fetching complete transaction:", fetchCompleteError);
+          // Fallback to the basic transaction if view fetch fails
+          return newTransaction;
+        }
+
+        // 5. Refresh pending transactions list
         await fetchPendingTransactions();
 
-        return newTransaction;
+        return completeTransaction || newTransaction;
       } catch (err: any) {
         console.error("Error approving transaction:", err);
         throw err;
@@ -135,6 +177,52 @@ export const usePendingTransactions = () => {
         await fetchPendingTransactions();
       } catch (err: any) {
         console.error("Error rejecting transaction:", err);
+        throw err;
+      }
+    },
+    [fetchPendingTransactions]
+  );
+
+  const restorePendingTransaction = useCallback(
+    async (pendingTransactionId: string) => {
+      try {
+        // Restore the pending transaction status back to pending
+        // Note: We do NOT delete the associated transaction if it was approved,
+        // as it may have been edited during approval and we want to preserve that
+        const { error } = await supabase
+          .from("pending_transactions")
+          .update({
+            status: "pending",
+            approved_at: null,
+            rejected_at: null,
+            transaction_id: null, // Clear the link but don't delete the actual transaction
+          })
+          .eq("id", pendingTransactionId);
+
+        if (error) throw error;
+
+        await fetchPendingTransactions();
+      } catch (err: any) {
+        console.error("Error restoring pending transaction:", err);
+        throw err;
+      }
+    },
+    [fetchPendingTransactions]
+  );
+
+  const deletePendingTransaction = useCallback(
+    async (pendingTransactionId: string) => {
+      try {
+        const { error } = await supabase
+          .from("pending_transactions")
+          .delete()
+          .eq("id", pendingTransactionId);
+
+        if (error) throw error;
+
+        await fetchPendingTransactions();
+      } catch (err: any) {
+        console.error("Error deleting pending transaction:", err);
         throw err;
       }
     },
@@ -168,11 +256,14 @@ export const usePendingTransactions = () => {
 
   return {
     pendingTransactions,
+    processedTransactions,
     loading,
     error,
     refetch: fetchPendingTransactions,
     approvePendingTransaction,
     rejectPendingTransaction,
+    restorePendingTransaction,
+    deletePendingTransaction,
     editPendingTransaction,
   };
 };

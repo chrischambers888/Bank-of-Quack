@@ -124,6 +124,21 @@ export const useAppData = () => {
 
   const addTransaction = useCallback(async (t: Partial<Transaction>) => {
     if (!t) return;
+    
+    // If transaction already has an ID, it was already inserted (e.g., from pending approval)
+    // Just update local state without inserting to database
+    if (t.id) {
+      setTransactions((prev) => {
+        // Check if transaction already exists to avoid duplicates
+        if (prev.find((tr) => tr.id === t.id)) {
+          return prev;
+        }
+        return [t as Transaction, ...prev];
+      });
+      return;
+    }
+    
+    // Otherwise, insert new transaction
     const { data, error } = await supabase
       .from("transactions")
       .insert([t])

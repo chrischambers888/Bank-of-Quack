@@ -25,7 +25,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export function ConnectedAccountsSettings() {
+interface ConnectedAccountsSettingsProps {
+  onSyncSuccess?: () => void;
+}
+
+export function ConnectedAccountsSettings({
+  onSyncSuccess,
+}: ConnectedAccountsSettingsProps) {
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
@@ -150,6 +156,8 @@ export function ConnectedAccountsSettings() {
         );
         // Update last_synced_at for the account
         await fetchAccounts();
+        // Notify parent that sync completed successfully (e.g., to update badge count)
+        onSyncSuccess?.();
       } else {
         throw new Error(data?.error || "Sync failed");
       }
@@ -216,7 +224,13 @@ export function ConnectedAccountsSettings() {
           <p className="text-sm text-white/80">
             Connect your bank accounts to automatically import transactions
           </p>
-          <PlaidLinkButton onSuccess={fetchAccounts} />
+          <PlaidLinkButton
+            onSuccess={() => {
+              fetchAccounts();
+              // Also trigger badge update since initial sync happens automatically
+              onSyncSuccess?.();
+            }}
+          />
         </div>
 
         {accounts.length === 0 ? (

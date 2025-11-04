@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PendingTransaction } from "@/types";
-import { CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { CheckCircle2, XCircle, RotateCcw, Trash2 } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 
 interface PendingTransactionCardProps {
@@ -15,9 +15,10 @@ interface PendingTransactionCardProps {
       account_last_four?: string;
     };
   };
-  onApprove: () => void;
-  onReject: () => void;
-  onEdit: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
+  onRestore?: () => void;
+  onDelete?: () => void;
   userNames: string[];
 }
 
@@ -25,10 +26,12 @@ export function PendingTransactionCard({
   transaction,
   onApprove,
   onReject,
-  onEdit,
+  onRestore,
+  onDelete,
   userNames,
 }: PendingTransactionCardProps) {
   const accountInfo = transaction.connected_accounts;
+  const isPending = transaction.status === "pending";
 
   return (
     <Card className="bg-white/5 border-white/20">
@@ -37,14 +40,17 @@ export function PendingTransactionCard({
           <div className="flex-1 space-y-2">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold text-white">{transaction.description}</h3>
+                <h3 className="font-semibold text-white">
+                  {transaction.description}
+                </h3>
                 <p className="text-sm text-white/60">
                   {new Date(transaction.date).toLocaleDateString()}
                 </p>
                 {accountInfo && (
                   <p className="text-xs text-white/50 mt-1">
                     {accountInfo.institution_name}
-                    {accountInfo.account_last_four && ` •••• ${accountInfo.account_last_four}`}
+                    {accountInfo.account_last_four &&
+                      ` •••• ${accountInfo.account_last_four}`}
                   </p>
                 )}
               </div>
@@ -52,7 +58,16 @@ export function PendingTransactionCard({
                 <p className="font-bold text-lg text-white">
                   {formatMoney(transaction.amount)}
                 </p>
-                <Badge variant="outline" className="mt-1">
+                <Badge
+                  variant="outline"
+                  className={`mt-1 ${
+                    transaction.status === "approved"
+                      ? "bg-green-600/20 border-green-600 text-green-300"
+                      : transaction.status === "rejected"
+                      ? "bg-red-600/20 border-red-600 text-red-300"
+                      : ""
+                  }`}
+                >
                   {transaction.status}
                 </Badge>
               </div>
@@ -76,31 +91,38 @@ export function PendingTransactionCard({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Button
-              size="sm"
-              onClick={onEdit}
-              variant="outline"
-              className="text-white border-white/20"
-            >
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-            <Button
-              size="sm"
-              onClick={onApprove}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-1" />
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              onClick={onReject}
-              variant="destructive"
-            >
-              <XCircle className="h-4 w-4 mr-1" />
-              Reject
-            </Button>
+            {isPending ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={onApprove}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Approve
+                </Button>
+                <Button size="sm" onClick={onReject} variant="destructive">
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Reject
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  onClick={onRestore}
+                  variant="outline"
+                  className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border-blue-600"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Restore
+                </Button>
+                <Button size="sm" onClick={onDelete} variant="destructive">
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardContent>

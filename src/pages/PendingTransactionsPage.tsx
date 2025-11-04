@@ -3,7 +3,14 @@ import React, { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { usePendingTransactions } from "@/hooks/usePendingTransactions";
+import { usePendingTransactionsCount } from "@/hooks/usePendingTransactionsCount";
 import { PendingTransactionCard } from "@/components/pending/PendingTransactionCard";
 import { PendingTransactionApprovalForm } from "@/components/pending/PendingTransactionApprovalForm";
 import { PendingTransaction, Transaction } from "@/types";
@@ -20,13 +27,17 @@ interface PendingTransactionsPageContext {
 export default function PendingTransactionsPage() {
   const navigate = useNavigate();
   const context = useOutletContext<PendingTransactionsPageContext>();
+  const { triggerRefetch } = usePendingTransactionsCount();
   const {
     pendingTransactions,
+    processedTransactions,
     loading,
     error,
     refetch,
     approvePendingTransaction,
     rejectPendingTransaction,
+    restorePendingTransaction,
+    deletePendingTransaction,
   } = usePendingTransactions();
 
   const [selectedTransaction, setSelectedTransaction] =
@@ -47,6 +58,8 @@ export default function PendingTransactionsPage() {
       if (context.addTransaction && newTransaction) {
         context.addTransaction(newTransaction);
       }
+      // Trigger badge count update
+      triggerRefetch();
       setIsApprovalFormOpen(false);
       setSelectedTransaction(null);
     } catch (error: any) {
@@ -55,13 +68,11 @@ export default function PendingTransactionsPage() {
   };
 
   const handleReject = async (pendingId: string) => {
-    if (!confirm("Are you sure you want to reject this transaction?")) {
-      return;
-    }
-
     try {
       setRejectingId(pendingId);
       await rejectPendingTransaction(pendingId);
+      // Trigger badge count update
+      triggerRefetch();
     } catch (error: any) {
       alert("Error rejecting transaction: " + error.message);
     } finally {
@@ -69,9 +80,33 @@ export default function PendingTransactionsPage() {
     }
   };
 
-  const handleEdit = (transaction: PendingTransaction) => {
-    setSelectedTransaction(transaction);
-    setIsApprovalFormOpen(true);
+  const handleRestore = async (pendingId: string) => {
+    try {
+      await restorePendingTransaction(pendingId);
+      // Trigger badge count update (restoring adds back to pending)
+      triggerRefetch();
+    } catch (error: any) {
+      alert("Error restoring transaction: " + error.message);
+    }
+  };
+
+  const handleDelete = async (pendingId: string) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this transaction? It will appear again on the next sync if it still exists in your bank account."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deletePendingTransaction(pendingId);
+      // Note: Deleting a processed transaction doesn't change pending count,
+      // but triggering refetch ensures consistency
+      triggerRefetch();
+    } catch (error: any) {
+      alert("Error deleting transaction: " + error.message);
+    }
   };
 
   if (loading) {
@@ -111,7 +146,8 @@ export default function PendingTransactionsPage() {
         </Button>
       </div>
 
-      {pendingTransactions.length === 0 ? (
+      {pendingTransactions.length === 0 &&
+      processedTransactions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-white/80 text-lg mb-2">
@@ -126,20 +162,53 @@ export default function PendingTransactionsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {pendingTransactions.map((transaction: any) => (
-            <PendingTransactionCard
-              key={transaction.id}
-              transaction={transaction}
-              userNames={context.userNames || []}
-              onApprove={() => {
-                setSelectedTransaction(transaction);
-                setIsApprovalFormOpen(true);
-              }}
-              onReject={() => handleReject(transaction.id)}
-              onEdit={() => handleEdit(transaction)}
-            />
-          ))}
+        <div className="space-y-4">
+          {/* Pending Transactions */}
+          {pendingTransactions.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-white">Pending</h2>
+              {pendingTransactions.map((transaction: any) => (
+                <PendingTransactionCard
+                  key={transaction.id}
+                  transaction={transaction}
+                  userNames={context.userNames || []}
+                  onApprove={() => {
+                    setSelectedTransaction(transaction);
+                    setIsApprovalFormOpen(true);
+                  }}
+                  onReject={() => handleReject(transaction.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Processed Transactions (Approved/Rejected) */}
+          {processedTransactions.length > 0 && (
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="processed" className="border-white/20">
+                <AccordionTrigger className="text-white hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <span className="text-xl font-semibold">
+                      Processed ({processedTransactions.length})
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 mt-2">
+                    {processedTransactions.map((transaction: any) => (
+                      <PendingTransactionCard
+                        key={transaction.id}
+                        transaction={transaction}
+                        userNames={context.userNames || []}
+                        onRestore={() => handleRestore(transaction.id)}
+                        onDelete={() => handleDelete(transaction.id)}
+                      />
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          )}
         </div>
       )}
 

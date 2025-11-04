@@ -2,7 +2,12 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +41,10 @@ interface PendingTransactionApprovalFormProps {
   categories: Category[];
   userNames: string[];
   transactions: Transaction[];
-  onApprove: (pendingId: string, transactionData: Partial<Transaction>) => Promise<void>;
+  onApprove: (
+    pendingId: string,
+    transactionData: Partial<Transaction>
+  ) => Promise<void>;
 }
 
 export function PendingTransactionApprovalForm({
@@ -56,8 +64,10 @@ export function PendingTransactionApprovalForm({
   const [paidOrReceivedBy, setPaidOrReceivedBy] = useState<string>("");
   const [paidToUserName, setPaidToUserName] = useState<string>("");
   const [splitType, setSplitType] = useState<string>("");
-  const [selectedReimbursesTransactionId, setSelectedReimbursesTransactionId] = useState<string>("none");
+  const [selectedReimbursesTransactionId, setSelectedReimbursesTransactionId] =
+    useState<string>("none");
   const [loading, setLoading] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const getExpenseSplitTypes = () => {
     if (!userNames || userNames.length < 2)
@@ -72,7 +82,13 @@ export function PendingTransactionApprovalForm({
 
   useEffect(() => {
     if (pendingTransaction && isOpen) {
-      setDate(new Date(pendingTransaction.date));
+      // Parse date properly - handle both string and Date objects
+      const transactionDate = pendingTransaction.date
+        ? typeof pendingTransaction.date === "string"
+          ? new Date(pendingTransaction.date)
+          : pendingTransaction.date
+        : new Date();
+      setDate(transactionDate);
       setDescription(pendingTransaction.description || "");
       setAmount(pendingTransaction.amount?.toString() || "");
       setTransactionType(pendingTransaction.transaction_type || "expense");
@@ -81,6 +97,7 @@ export function PendingTransactionApprovalForm({
       setPaidToUserName(pendingTransaction.paid_to_user_name || "");
       setSplitType(pendingTransaction.split_type || "");
       setSelectedReimbursesTransactionId("none");
+      setDatePickerOpen(false); // Reset date picker state
     }
   }, [pendingTransaction, isOpen]);
 
@@ -113,12 +130,19 @@ export function PendingTransactionApprovalForm({
     } else if (transactionType === "settlement") {
       transactionData.paid_by_user_name = paidOrReceivedBy;
       transactionData.paid_to_user_name = paidToUserName;
-    } else if (transactionType === "income" || transactionType === "reimbursement") {
+    } else if (
+      transactionType === "income" ||
+      transactionType === "reimbursement"
+    ) {
       transactionData.paid_to_user_name = paidOrReceivedBy;
     }
 
-    if (transactionType === "reimbursement" && selectedReimbursesTransactionId !== "none") {
-      transactionData.reimburses_transaction_id = selectedReimbursesTransactionId;
+    if (
+      transactionType === "reimbursement" &&
+      selectedReimbursesTransactionId !== "none"
+    ) {
+      transactionData.reimburses_transaction_id =
+        selectedReimbursesTransactionId;
     }
 
     try {
@@ -144,9 +168,14 @@ export function PendingTransactionApprovalForm({
           {/* Date */}
           <div className="space-y-2">
             <Label>Date</Label>
-            <Popover>
+            <Popover
+              open={datePickerOpen}
+              onOpenChange={setDatePickerOpen}
+              modal={true}
+            >
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal bg-white/10 text-white border-white/20",
@@ -157,11 +186,24 @@ export function PendingTransactionApprovalForm({
                   {date ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent
+                className="w-auto p-0 bg-white z-[100]"
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={setDate}
+                  onSelect={(selectedDate) => {
+                    console.log("Date selected in calendar:", selectedDate);
+                    if (selectedDate) {
+                      setDate(selectedDate);
+                      // Close popover after date selection
+                      setTimeout(() => {
+                        setDatePickerOpen(false);
+                      }, 150);
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
@@ -214,7 +256,10 @@ export function PendingTransactionApprovalForm({
             <>
               <div className="space-y-2">
                 <Label>Category *</Label>
-                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                <Select
+                  value={selectedCategoryId}
+                  onValueChange={setSelectedCategoryId}
+                >
                   <SelectTrigger className="bg-white/10 text-white border-white/20">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -230,7 +275,10 @@ export function PendingTransactionApprovalForm({
 
               <div className="space-y-2">
                 <Label>Paid By *</Label>
-                <Select value={paidOrReceivedBy} onValueChange={setPaidOrReceivedBy}>
+                <Select
+                  value={paidOrReceivedBy}
+                  onValueChange={setPaidOrReceivedBy}
+                >
                   <SelectTrigger className="bg-white/10 text-white border-white/20">
                     <SelectValue placeholder="Select user" />
                   </SelectTrigger>
@@ -267,7 +315,10 @@ export function PendingTransactionApprovalForm({
             <>
               <div className="space-y-2">
                 <Label>Paid By *</Label>
-                <Select value={paidOrReceivedBy} onValueChange={setPaidOrReceivedBy}>
+                <Select
+                  value={paidOrReceivedBy}
+                  onValueChange={setPaidOrReceivedBy}
+                >
                   <SelectTrigger className="bg-white/10 text-white border-white/20">
                     <SelectValue placeholder="Select user" />
                   </SelectTrigger>
@@ -283,7 +334,10 @@ export function PendingTransactionApprovalForm({
 
               <div className="space-y-2">
                 <Label>Paid To *</Label>
-                <Select value={paidToUserName} onValueChange={setPaidToUserName}>
+                <Select
+                  value={paidToUserName}
+                  onValueChange={setPaidToUserName}
+                >
                   <SelectTrigger className="bg-white/10 text-white border-white/20">
                     <SelectValue placeholder="Select user" />
                   </SelectTrigger>
@@ -299,10 +353,14 @@ export function PendingTransactionApprovalForm({
             </>
           )}
 
-          {(transactionType === "income" || transactionType === "reimbursement") && (
+          {(transactionType === "income" ||
+            transactionType === "reimbursement") && (
             <div className="space-y-2">
               <Label>Received By *</Label>
-              <Select value={paidOrReceivedBy} onValueChange={setPaidOrReceivedBy}>
+              <Select
+                value={paidOrReceivedBy}
+                onValueChange={setPaidOrReceivedBy}
+              >
                 <SelectTrigger className="bg-white/10 text-white border-white/20">
                   <SelectValue placeholder="Select user" />
                 </SelectTrigger>
@@ -342,7 +400,12 @@ export function PendingTransactionApprovalForm({
           )}
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>

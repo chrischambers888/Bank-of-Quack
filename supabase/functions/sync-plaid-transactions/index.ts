@@ -204,8 +204,25 @@ serve(async (req: Request) => {
       }
 
       // Determine transaction type based on amount
-      // Plaid uses negative amounts for debits (expenses) and positive for credits (income)
-      const transactionType = txn.amount < 0 ? 'expense' : 'income'
+      // Default to 'expense' as most transactions are expenses
+      // Plaid amount conventions vary by account type, so we use a conservative approach:
+      // - Default to expense
+      // - Only mark as income if amount is clearly positive (for checking/savings) or negative (for credit cards)
+      let transactionType: 'expense' | 'income' = 'expense'
+      
+      if (account.account_type === 'credit_card') {
+        // For credit cards: negative amount typically means payment (income/credit)
+        if (txn.amount < 0) {
+          transactionType = 'income'
+        }
+      } else {
+        // For checking/savings: positive amount typically means deposit (income)
+        // But we default to expense unless amount is clearly positive
+        if (txn.amount > 0) {
+          transactionType = 'income'
+        }
+      }
+      
       const amount = Math.abs(txn.amount)
 
       // Get description from transaction name or merchant name

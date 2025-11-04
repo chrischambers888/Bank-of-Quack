@@ -15,6 +15,7 @@ import TransactionTemplatesSettings from "@/components/settings/TransactionTempl
 import { BudgetSettings } from "@/components/settings/BudgetSettings";
 import ImportDialog from "@/components/settings/ImportDialog";
 import { ConnectedAccountsSettings } from "@/components/settings/ConnectedAccountsSettings";
+import { usePendingTransactionsCount } from "@/hooks/usePendingTransactionsCount";
 
 interface Transaction {
   id: string;
@@ -51,6 +52,7 @@ interface SettingsPageContext {
 
 const SettingsPage = () => {
   const context = useOutletContext<SettingsPageContext>();
+  const { triggerRefetch } = usePendingTransactionsCount();
 
   const [user1ImageUrl, setUser1ImageUrl] = useState<string | null>(null);
   const [user2ImageUrl, setUser2ImageUrl] = useState<string | null>(null);
@@ -210,7 +212,7 @@ const SettingsPage = () => {
           initialEmptyStateImageUrl={emptyStateImageUrl}
         />
 
-        <ConnectedAccountsSettings />
+        <ConnectedAccountsSettings onSyncSuccess={triggerRefetch} />
 
         <CategorySettings
           categories={categories}
