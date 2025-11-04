@@ -59,6 +59,8 @@ export function ConnectedAccountsSettings() {
   const handleSync = async (accountId: string) => {
     try {
       setSyncingAccountId(accountId);
+      console.log("Syncing account:", accountId, "days_back:", syncDaysBack);
+
       const { data, error } = await supabase.functions.invoke(
         "sync-plaid-transactions",
         {
@@ -69,7 +71,76 @@ export function ConnectedAccountsSettings() {
         }
       );
 
-      if (error) throw error;
+      console.log("Sync response - data:", data, "error:", error);
+
+      if (error) {
+        // Try to extract error message from error object
+        let errorMessage = error.message || "Unknown error";
+
+        // The Supabase client doesn't automatically parse error response bodies
+        // We need to manually read it from the Response object
+        // Note: error.context IS the Response object
+        const response = error.context;
+        if (response && typeof response.text === "function") {
+          try {
+            console.log(
+              "Response status:",
+              response.status,
+              "bodyUsed:",
+              response.bodyUsed
+            );
+
+            // Try to read as text (response should be available since bodyUsed: false)
+            if (!response.bodyUsed) {
+              const text = await response.text();
+              console.log("Error response text:", text);
+
+              // Try to parse as JSON
+              if (text) {
+                try {
+                  const errorData = JSON.parse(text);
+                  console.log("Parsed error data:", errorData);
+                  if (errorData?.error) {
+                    errorMessage = errorData.error;
+                  }
+                } catch (parseError) {
+                  // If not JSON, use the text as the error message
+                  console.log(
+                    "Response is not JSON, using text as error:",
+                    text
+                  );
+                  errorMessage = text;
+                }
+              }
+            } else {
+              console.warn("Response body already consumed");
+            }
+          } catch (readError) {
+            console.error("Could not read error response body:", readError);
+          }
+        } else {
+          console.warn("error.context is not a readable Response:", response);
+        }
+
+        // Check if error has context with message
+        if (error.context?.msg) {
+          errorMessage = error.context.msg;
+        }
+
+        // Check if data contains error message (sometimes it's in data even with error)
+        if (data?.error) {
+          errorMessage = data.error;
+        }
+
+        console.error("Sync error details:", {
+          error,
+          data,
+          errorMessage,
+          errorContext: error.context,
+        });
+
+        throw new Error(errorMessage);
+      }
 
       if (data?.success) {
         alert(
@@ -84,7 +155,9 @@ export function ConnectedAccountsSettings() {
       }
     } catch (error: any) {
       console.error("Error syncing transactions:", error);
-      alert("Error syncing transactions: " + error.message);
+      const errorMessage =
+        error.message || error.toString() || "Failed to sync transactions";
+      alert("Error syncing transactions: " + errorMessage);
     } finally {
       setSyncingAccountId(null);
     }

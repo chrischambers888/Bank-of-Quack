@@ -144,7 +144,37 @@ serve(async (req: Request) => {
       }
     } catch (plaidError: any) {
       console.error('Plaid API error:', plaidError)
-      throw new Error('Failed to fetch transactions from Plaid: ' + (plaidError.message || JSON.stringify(plaidError)))
+      console.error('Plaid error response:', plaidError.response?.data)
+      console.error('Plaid error status:', plaidError.response?.status)
+      console.error('Plaid error body:', JSON.stringify(plaidError.response?.data || plaidError.body || plaidError, null, 2))
+      
+      // Extract detailed error information from Plaid
+      let errorMessage = 'Failed to fetch transactions from Plaid'
+      let errorCode = null
+      
+      if (plaidError.response?.data) {
+        const plaidErrorData = plaidError.response.data
+        errorCode = plaidErrorData.error_code || plaidErrorData.error?.error_code
+        const plaidMessage = plaidErrorData.error_message || plaidErrorData.error?.error_message || plaidErrorData.error_message
+        
+        if (plaidMessage) {
+          errorMessage = `${errorMessage}: ${plaidMessage}`
+        }
+        
+        // Add error code if available
+        if (errorCode) {
+          errorMessage = `${errorMessage} (Error code: ${errorCode})`
+        }
+        
+        // Common Plaid error codes that need special handling
+        if (errorCode === 'ITEM_LOGIN_REQUIRED' || errorCode === 'INVALID_ACCESS_TOKEN') {
+          errorMessage = `${errorMessage}. The account needs to be reconnected.`
+        }
+      } else {
+        errorMessage = `${errorMessage}: ${plaidError.message || JSON.stringify(plaidError)}`
+      }
+      
+      throw new Error(errorMessage)
     }
 
     // Insert new transactions as pending
