@@ -14,6 +14,7 @@ import TransactionManagement from "@/components/settings/TransactionManagement";
 import TransactionTemplatesSettings from "@/components/settings/TransactionTemplatesSettings";
 import { BudgetSettings } from "@/components/settings/BudgetSettings";
 import ImportDialog from "@/components/settings/ImportDialog";
+import { ConnectedAccountsSettings } from "@/components/settings/ConnectedAccountsSettings";
 
 interface Transaction {
   id: string;
@@ -208,6 +209,8 @@ const SettingsPage = () => {
         <EmptyStateImageSettings
           initialEmptyStateImageUrl={emptyStateImageUrl}
         />
+
+        <ConnectedAccountsSettings />
 
         <CategorySettings
           categories={categories}

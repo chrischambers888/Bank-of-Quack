@@ -5,16 +5,32 @@ import {
   Settings as SettingsIcon,
   LogOut,
   DollarSign,
+  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/supabaseClient";
+import { usePendingTransactionsCount } from "@/hooks/usePendingTransactionsCount";
 
-const NAV_LINKS = [
+interface NavLink {
+  label: string;
+  icon: React.ReactElement;
+  to: string;
+  badge?: number;
+}
+
+const getNavLinks = (pendingCount: number): NavLink[] => [
   {
     label: "Dashboard",
     icon: <Home className="w-6 h-6 text-green-500" />,
     to: "/",
+  },
+  {
+    label: "Pending",
+    icon: <Clock className="w-6 h-6 text-green-500" />,
+    to: "/pending",
+    badge: pendingCount > 0 ? pendingCount : undefined,
   },
   {
     label: "New Transaction",
@@ -41,6 +57,7 @@ interface DuckFabNavProps {
 const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
+  const { count: pendingCount } = usePendingTransactionsCount();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -63,6 +80,8 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
     navigate("/login", { replace: true });
   };
 
+  const navLinks = getNavLinks(pendingCount);
+
   return (
     <>
       {/* Overlay */}
@@ -83,15 +102,20 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
           transform: open ? "translateY(-5rem)" : "translateY(0px)",
         }}
       >
-        {NAV_LINKS.map((link, i) => (
+        {navLinks.map((link: NavLink, i: number) => (
           <button
             key={link.to}
             onClick={() => handleNav(link.to)}
-            className="flex items-center group"
+            className="flex items-center group relative"
             style={{ transitionDelay: `${open ? i * 60 : 0}ms` }}
           >
-            <span className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center transition-transform group-active:scale-95">
+            <span className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center transition-transform group-active:scale-95 relative">
               {link.icon}
+              {link.badge && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-500 hover:bg-red-600">
+                  {link.badge > 99 ? "99+" : link.badge}
+                </Badge>
+              )}
             </span>
           </button>
         ))}

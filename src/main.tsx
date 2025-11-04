@@ -13,6 +13,7 @@ import DashboardPage from "./pages/DashboardPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import SettingsPage from "./pages/SettingsPage";
 import { BudgetsPage } from "./pages/BudgetsPage";
+import PendingTransactionsPage from "./pages/PendingTransactionsPage";
 
 import LoginPage from "./pages/LoginPage";
 
@@ -46,6 +47,10 @@ const router = createBrowserRouter([
       {
         path: "budgets", // Corresponds to '/budgets'
         element: <BudgetsPage />,
+      },
+      {
+        path: "pending", // Corresponds to '/pending'
+        element: <PendingTransactionsPage />,
       },
     ],
   },

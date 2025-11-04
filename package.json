@@ -42,6 +42,7 @@
     "react-day-picker": "^9.7.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.56.3",
+    "react-plaid-link": "^4.1.1",
     "react-router-dom": "^7.6.0",
     "recharts": "^2.15.3",
     "tailwind-merge": "^3.3.0",
