@@ -102,9 +102,12 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
         console.error("Metadata:", JSON.stringify(metadata, null, 2));
 
         // Provide more helpful error messages
-        if (err.error_message?.toLowerCase().includes("phone")) {
+        if (
+          err.error_message?.toLowerCase().includes("phone") ||
+          err.error_message?.toLowerCase().includes("too_short")
+        ) {
           setError(
-            "Phone number format issue. Please use format: +1XXXXXXXXXX (e.g., +15551234567)"
+            "Phone verification issue. In Sandbox mode, use test number: +15005550001 with verification code: 1234"
           );
         } else {
           setError(err.error_message || err.message || "Connection cancelled");
@@ -115,9 +118,12 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
       console.log("Plaid Link event:", eventName, metadata);
       if (eventName === "ERROR" && metadata?.error_message) {
         console.error("Plaid Link error event:", metadata.error_message);
-        if (metadata.error_message?.toLowerCase().includes("phone")) {
+        if (
+          metadata.error_message?.toLowerCase().includes("phone") ||
+          metadata.error_message?.toLowerCase().includes("too_short")
+        ) {
           setError(
-            "Phone number format issue. Please use format: +1XXXXXXXXXX (e.g., +15551234567)"
+            "Phone verification issue. In Sandbox mode, use test number: +15005550001 with verification code: 1234"
           );
         }
       }

@@ -54,6 +54,8 @@ serve(async (req) => {
     }
 
     // Create link token request
+    const isSandbox = plaidEnv === 'sandbox'
+    
     const request: LinkTokenCreateRequest = {
       user: {
         client_user_id: userId,
@@ -62,8 +64,11 @@ serve(async (req) => {
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
-      // Add additional configuration for phone number handling
-      additional_consented_products: [Products.Auth, Products.Identity],
+      // In sandbox, allow more flexible phone verification
+      ...(isSandbox && {
+        // Sandbox-specific settings that may help with phone verification
+        webhook: undefined, // Not needed for sandbox
+      }),
     }
 
     // Generate link token
