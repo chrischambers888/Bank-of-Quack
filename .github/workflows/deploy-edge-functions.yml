@@ -21,4 +21,6 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           supabase link --project-ref "$SUPABASE_PROJECT_ID"
-          supabase functions deploy
+          supabase functions deploy create-plaid-link-token
+          supabase functions deploy exchange-plaid-token
+          supabase functions deploy sync-plaid-transactions
