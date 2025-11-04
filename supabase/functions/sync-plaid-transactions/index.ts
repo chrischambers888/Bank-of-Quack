@@ -102,11 +102,14 @@ serve(async (req: Request) => {
     const formatDate = (date: Date) => date.toISOString().split('T')[0]
 
     // Fetch transactions from Plaid
+    // Note: account_ids should be in options object for newer Plaid API versions
     const request: TransactionsGetRequest = {
       access_token: account.plaid_access_token!,
       start_date: formatDate(startDate),
       end_date: formatDate(endDate),
-      account_ids: [account.plaid_account_id!],
+      options: {
+        account_ids: [account.plaid_account_id!],
+      },
     }
 
     console.log('Fetching transactions from Plaid:', {
