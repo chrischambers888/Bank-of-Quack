@@ -158,6 +158,8 @@ export function ConnectedAccountsSettings({
         await fetchAccounts();
         // Notify parent that sync completed successfully (e.g., to update badge count)
         onSyncSuccess?.();
+        // Dispatch event to trigger refetch of pending transactions total count
+        window.dispatchEvent(new Event("pendingTransactionsTotal:refetch"));
       } else {
         throw new Error(data?.error || "Sync failed");
       }

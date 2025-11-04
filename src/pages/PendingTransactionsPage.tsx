@@ -9,12 +9,23 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { usePendingTransactions } from "@/hooks/usePendingTransactions";
 import { usePendingTransactionsCount } from "@/hooks/usePendingTransactionsCount";
 import { PendingTransactionCard } from "@/components/pending/PendingTransactionCard";
 import { PendingTransactionApprovalForm } from "@/components/pending/PendingTransactionApprovalForm";
 import { PendingTransaction, Transaction } from "@/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface PendingTransactionsPageContext {
@@ -38,12 +49,14 @@ export default function PendingTransactionsPage() {
     rejectPendingTransaction,
     restorePendingTransaction,
     deletePendingTransaction,
+    deleteAllProcessedTransactions,
   } = usePendingTransactions();
 
   const [selectedTransaction, setSelectedTransaction] =
     useState<PendingTransaction | null>(null);
   const [isApprovalFormOpen, setIsApprovalFormOpen] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const handleApprove = async (
     pendingId: string,
@@ -106,6 +119,20 @@ export default function PendingTransactionsPage() {
       triggerRefetch();
     } catch (error: any) {
       alert("Error deleting transaction: " + error.message);
+    }
+  };
+
+  const handleDeleteAllProcessed = async () => {
+    try {
+      setIsDeletingAll(true);
+      await deleteAllProcessedTransactions();
+      // Trigger refetch of pending transactions count and total count
+      triggerRefetch();
+      window.dispatchEvent(new Event("pendingTransactionsTotal:refetch"));
+    } catch (error: any) {
+      alert("Error deleting processed transactions: " + error.message);
+    } finally {
+      setIsDeletingAll(false);
     }
   };
 
@@ -195,6 +222,39 @@ export default function PendingTransactionsPage() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-3 mt-2">
+                    <div className="flex justify-end mb-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isDeletingAll}
+                            className="text-white border-white/20 hover:bg-white/10"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {isDeletingAll ? "Deleting..." : "Delete All Processed"}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete All Processed Transactions?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete all {processedTransactions.length} processed transactions (approved and rejected). 
+                              This action cannot be undone. If you sync again, these transactions may reappear if they still exist in your bank account.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleDeleteAllProcessed}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete All
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                     {processedTransactions.map((transaction: any) => (
                       <PendingTransactionCard
                         key={transaction.id}

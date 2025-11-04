@@ -229,6 +229,26 @@ export const usePendingTransactions = () => {
     [fetchPendingTransactions]
   );
 
+  const deleteAllProcessedTransactions = useCallback(
+    async () => {
+      try {
+        // Delete all processed transactions (approved or rejected)
+        const { error } = await supabase
+          .from("pending_transactions")
+          .delete()
+          .in("status", ["approved", "rejected"]);
+
+        if (error) throw error;
+
+        await fetchPendingTransactions();
+      } catch (err: any) {
+        console.error("Error deleting all processed transactions:", err);
+        throw err;
+      }
+    },
+    [fetchPendingTransactions]
+  );
+
   const editPendingTransaction = useCallback(
     async (
       pendingTransactionId: string,
@@ -264,6 +284,7 @@ export const usePendingTransactions = () => {
     rejectPendingTransaction,
     restorePendingTransaction,
     deletePendingTransaction,
+    deleteAllProcessedTransactions,
     editPendingTransaction,
   };
 };

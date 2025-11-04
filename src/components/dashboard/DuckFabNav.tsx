@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Home,
   Plus,
@@ -20,34 +20,45 @@ interface NavLink {
   badge?: number;
 }
 
-const getNavLinks = (pendingCount: number): NavLink[] => [
-  {
-    label: "Dashboard",
-    icon: <Home className="w-6 h-6 text-green-500" />,
-    to: "/",
-  },
-  {
-    label: "Pending",
-    icon: <Clock className="w-6 h-6 text-green-500" />,
-    to: "/pending",
-    badge: pendingCount > 0 ? pendingCount : undefined,
-  },
-  {
-    label: "New Transaction",
-    icon: <Plus className="w-6 h-6 text-green-500" />,
-    to: "/transactions",
-  },
-  {
-    label: "Budgets",
-    icon: <DollarSign className="w-6 h-6 text-green-500" />,
-    to: "/budgets",
-  },
-  {
-    label: "Settings",
-    icon: <SettingsIcon className="w-6 h-6 text-green-500" />,
-    to: "/settings",
-  },
-];
+const getNavLinks = (pendingCount: number, hasAnyPendingTransactions: boolean): NavLink[] => {
+  const links: NavLink[] = [
+    {
+      label: "Dashboard",
+      icon: <Home className="w-6 h-6 text-green-500" />,
+      to: "/",
+    },
+  ];
+
+  // Only show Pending link if there are any pending transactions (any status)
+  if (hasAnyPendingTransactions) {
+    links.push({
+      label: "Pending",
+      icon: <Clock className="w-6 h-6 text-green-500" />,
+      to: "/pending",
+      badge: pendingCount > 0 ? pendingCount : undefined,
+    });
+  }
+
+  links.push(
+    {
+      label: "New Transaction",
+      icon: <Plus className="w-6 h-6 text-green-500" />,
+      to: "/transactions",
+    },
+    {
+      label: "Budgets",
+      icon: <DollarSign className="w-6 h-6 text-green-500" />,
+      to: "/budgets",
+    },
+    {
+      label: "Settings",
+      icon: <SettingsIcon className="w-6 h-6 text-green-500" />,
+      to: "/settings",
+    }
+  );
+
+  return links;
+};
 
 interface DuckFabNavProps {
   open: boolean;
@@ -57,6 +68,7 @@ interface DuckFabNavProps {
 const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
+  const [hasAnyPendingTransactions, setHasAnyPendingTransactions] = useState(false);
   const { count: pendingCount } = usePendingTransactionsCount();
 
   useEffect(() => {
@@ -67,6 +79,52 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
       setLoggedIn(!!session);
     };
     checkSession();
+  }, []);
+
+  // Check if there are any pending transactions (any status)
+  useEffect(() => {
+    const checkAnyPendingTransactions = async () => {
+      try {
+        const { count, error } = await supabase
+          .from("pending_transactions")
+          .select("*", { count: "exact", head: true });
+
+        if (error) throw error;
+        setHasAnyPendingTransactions((count || 0) > 0);
+      } catch (error) {
+        console.error("Error checking pending transactions:", error);
+        setHasAnyPendingTransactions(false);
+      }
+    };
+
+    checkAnyPendingTransactions();
+
+    // Set up real-time subscription to listen for any changes to pending_transactions
+    const subscription = supabase
+      .channel("pending_transactions_total_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "pending_transactions",
+        },
+        () => {
+          checkAnyPendingTransactions();
+        }
+      )
+      .subscribe();
+
+    // Listen for custom event to trigger refetch (for immediate updates after sync)
+    const handleRefetchEvent = () => {
+      checkAnyPendingTransactions();
+    };
+    window.addEventListener("pendingTransactionsTotal:refetch", handleRefetchEvent);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("pendingTransactionsTotal:refetch", handleRefetchEvent);
+    };
   }, []);
 
   const handleNav = (to: string) => {
@@ -80,7 +138,7 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
     navigate("/login", { replace: true });
   };
 
-  const navLinks = getNavLinks(pendingCount);
+  const navLinks = getNavLinks(pendingCount, hasAnyPendingTransactions);
 
   return (
     <>
