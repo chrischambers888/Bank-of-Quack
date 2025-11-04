@@ -1,4 +1,5 @@
 // supabase/functions/exchange-plaid-token/index.ts
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { Configuration, PlaidApi, PlaidEnvironments } from 'https://esm.sh/plaid@25.0.0'
@@ -8,16 +9,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { public_token, institution_id, institution_name, accounts } = await req.json()
+    const body = await req.json()
+    console.log('Received request body:', JSON.stringify(body, null, 2))
     
-    if (!public_token || !institution_id || !institution_name || !accounts || !Array.isArray(accounts)) {
-      throw new Error('Missing required fields: public_token, institution_id, institution_name, accounts')
+    const { public_token, institution_id, institution_name, accounts } = body
+    
+    // Validate required fields with detailed error messages
+    if (!public_token) {
+      throw new Error('Missing required field: public_token')
+    }
+    if (!institution_id) {
+      throw new Error('Missing required field: institution_id. Received body: ' + JSON.stringify(body))
+    }
+    if (!institution_name) {
+      throw new Error('Missing required field: institution_name. Received body: ' + JSON.stringify(body))
+    }
+    if (!accounts) {
+      throw new Error('Missing required field: accounts. Received body: ' + JSON.stringify(body))
+    }
+    if (!Array.isArray(accounts)) {
+      throw new Error('accounts must be an array. Received: ' + typeof accounts)
+    }
+    if (accounts.length === 0) {
+      throw new Error('accounts array is empty. No accounts were selected.')
     }
 
     // Initialize Plaid client

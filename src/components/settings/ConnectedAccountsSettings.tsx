@@ -113,7 +113,11 @@ export function ConnectedAccountsSettings() {
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "Never";
     const date = new Date(dateString);
-    return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString() +
+      " " +
+      date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
   };
 
   if (loading) {
@@ -145,7 +149,9 @@ export function ConnectedAccountsSettings() {
         {accounts.length === 0 ? (
           <div className="text-center py-8 text-white/60">
             <p>No connected accounts yet.</p>
-            <p className="text-sm mt-2">Click "Connect Bank Account" to get started.</p>
+            <p className="text-sm mt-2">
+              Click "Connect Bank Account" to get started.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -161,7 +167,8 @@ export function ConnectedAccountsSettings() {
                     </h3>
                     <p className="text-sm text-white/60">
                       {account.institution_name}
-                      {account.account_last_four && ` •••• ${account.account_last_four}`}
+                      {account.account_last_four &&
+                        ` •••• ${account.account_last_four}`}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="outline" className="text-xs">
@@ -191,10 +198,7 @@ export function ConnectedAccountsSettings() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Select
-                    value={syncDaysBack}
-                    onValueChange={setSyncDaysBack}
-                  >
+                  <Select value={syncDaysBack} onValueChange={setSyncDaysBack}>
                     <SelectTrigger className="w-32 bg-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
@@ -233,7 +237,9 @@ export function ConnectedAccountsSettings() {
             <AlertDialogHeader>
               <AlertDialogTitle>Remove Connected Account?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will remove the account connection. Pending transactions from this account will remain, but no new transactions will be synced. You can reconnect this account anytime.
+                This will remove the account connection. Pending transactions
+                from this account will remain, but no new transactions will be
+                synced. You can reconnect this account anytime.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -14,6 +14,14 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSandbox, setIsSandbox] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if we're in sandbox mode (you could also make this an API call to check env)
+    // For now, we'll detect based on the error messages or make it configurable
+    // In a real app, you might want to add an endpoint that returns the current environment
+    setIsSandbox(true); // Default to true for now - update this when switching to production
+  }, []);
 
   useEffect(() => {
     // Get link token from Edge Function
@@ -52,16 +60,38 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
       setLoading(true);
       setError(null);
 
+      console.log("Plaid Link success - public_token:", public_token);
+      console.log("Plaid Link metadata:", JSON.stringify(metadata, null, 2));
+
+      // Validate metadata structure
+      if (!metadata?.institution) {
+        throw new Error("Missing institution data in Plaid response");
+      }
+      if (
+        !metadata?.accounts ||
+        !Array.isArray(metadata.accounts) ||
+        metadata.accounts.length === 0
+      ) {
+        throw new Error("No accounts selected or accounts data is missing");
+      }
+
       // Exchange public token for access token via Edge Function
+      const requestBody = {
+        public_token,
+        institution_id: metadata.institution.institution_id,
+        institution_name: metadata.institution.name,
+        accounts: metadata.accounts,
+      };
+
+      console.log(
+        "Sending to Edge Function:",
+        JSON.stringify(requestBody, null, 2)
+      );
+
       const { data, error: exchangeError } = await supabase.functions.invoke(
         "exchange-plaid-token",
         {
-          body: {
-            public_token,
-            institution_id: metadata.institution.institution_id,
-            institution_name: metadata.institution.name,
-            accounts: metadata.accounts,
-          },
+          body: requestBody,
         }
       );
 
@@ -143,6 +173,41 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
 
   return (
     <div className="space-y-2">
+      {isSandbox && (
+        <div className="text-xs text-white/60 space-y-1 bg-yellow-900/20 border border-yellow-700/50 rounded p-2">
+          <p>
+            ⚠️ <strong>Sandbox Mode:</strong> You're currently testing with fake
+            accounts.
+          </p>
+          <p className="text-xs mt-1">
+            To connect real accounts, switch to Production mode in your Supabase
+            Edge Function secrets: Set{" "}
+            <code className="bg-black/30 px-1 rounded">
+              PLAID_ENV=production
+            </code>{" "}
+            and use Production API keys.
+          </p>
+        </div>
+      )}
+      {isSandbox && (
+        <div className="text-xs text-white/60 space-y-1">
+          <p>
+            💡 <strong>Sandbox tips:</strong>
+          </p>
+          <ul className="list-disc list-inside ml-2 space-y-0.5">
+            <li>Click "Continue as guest" to skip phone verification</li>
+            <li>
+              Selecting banks may show "First Platypus Bank" - this is normal in
+              Sandbox
+            </li>
+            <li>
+              Use test credentials:{" "}
+              <code className="bg-black/30 px-1 rounded">user_good</code> /{" "}
+              <code className="bg-black/30 px-1 rounded">pass_good</code>
+            </li>
+          </ul>
+        </div>
+      )}
       <Button onClick={() => open()} disabled={!ready || !linkToken || loading}>
         {loading ? (
           <>
