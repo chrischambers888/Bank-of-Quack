@@ -9,16 +9,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { account_id, days_back = 7 } = await req.json()
+    const body = await req.json()
+    console.log('Received request body:', JSON.stringify(body, null, 2))
+    
+    const { account_id, days_back = 7 } = body
     
     if (!account_id) {
-      throw new Error('Missing required field: account_id')
+      throw new Error('Missing required field: account_id. Received body: ' + JSON.stringify(body))
     }
 
     // Validate days_back (default 7, max 90)
@@ -48,13 +51,34 @@ serve(async (req) => {
       .eq('user_id', user.id) // Additional check for security
       .single()
 
-    if (accountError || !account) {
-      throw new Error('Account not found or access denied')
+    if (accountError) {
+      console.error('Error fetching account:', accountError)
+      throw new Error('Account not found or access denied: ' + accountError.message)
+    }
+
+    if (!account) {
+      throw new Error(`Account not found: ${account_id} for user ${user.id}`)
     }
 
     if (!account.is_active) {
       throw new Error('Account is not active')
     }
+
+    // Validate required Plaid fields
+    if (!account.plaid_access_token) {
+      throw new Error('Account missing Plaid access token. Account may need to be reconnected.')
+    }
+
+    if (!account.plaid_account_id) {
+      throw new Error('Account missing Plaid account ID. Account may need to be reconnected.')
+    }
+
+    console.log('Account found:', {
+      id: account.id,
+      name: account.account_name,
+      has_access_token: !!account.plaid_access_token,
+      has_account_id: !!account.plaid_account_id,
+    })
 
     // Initialize Plaid client
     const plaidEnv = Deno.env.get('PLAID_ENV') || 'sandbox'
@@ -85,29 +109,42 @@ serve(async (req) => {
       account_ids: [account.plaid_account_id!],
     }
 
+    console.log('Fetching transactions from Plaid:', {
+      start_date: formatDate(startDate),
+      end_date: formatDate(endDate),
+      account_id: account.plaid_account_id,
+    })
+
     let allTransactions: any[] = []
     let hasMore = true
     let cursor: string | undefined = undefined
 
     // Handle pagination (Plaid returns up to 500 transactions per request)
-    while (hasMore) {
-      if (cursor) {
-        request.cursor = cursor
+    try {
+      while (hasMore) {
+        if (cursor) {
+          request.cursor = cursor
+        }
+
+        const response = await plaidClient.transactionsGet(request)
+        const transactions = response.data.transactions || []
+        allTransactions = allTransactions.concat(transactions)
+
+        console.log(`Fetched ${transactions.length} transactions (total: ${allTransactions.length})`)
+
+        // Check if there are more transactions
+        hasMore = response.data.has_more || false
+        cursor = response.data.next_cursor || undefined
+
+        // Safety limit to prevent infinite loops
+        if (allTransactions.length > 10000) {
+          console.warn('Transaction limit reached, stopping pagination')
+          break
+        }
       }
-
-      const response = await plaidClient.transactionsGet(request)
-      const transactions = response.data.transactions || []
-      allTransactions = allTransactions.concat(transactions)
-
-      // Check if there are more transactions
-      hasMore = response.data.has_more || false
-      cursor = response.data.next_cursor || undefined
-
-      // Safety limit to prevent infinite loops
-      if (allTransactions.length > 10000) {
-        console.warn('Transaction limit reached, stopping pagination')
-        break
-      }
+    } catch (plaidError: any) {
+      console.error('Plaid API error:', plaidError)
+      throw new Error('Failed to fetch transactions from Plaid: ' + (plaidError.message || JSON.stringify(plaidError)))
     }
 
     // Insert new transactions as pending
