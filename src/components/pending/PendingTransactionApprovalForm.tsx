@@ -1,5 +1,5 @@
 // src/components/pending/PendingTransactionApprovalForm.tsx
-import React, { useState, useEffect, FormEvent } from "react";
+import React, { useState, useEffect, FormEvent, useMemo } from "react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Popover,
   PopoverContent,
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 import { PendingTransaction, Category, Transaction } from "@/types";
 
 const TRANSACTION_TYPES = [
@@ -33,6 +36,10 @@ const TRANSACTION_TYPES = [
   { value: "settlement", label: "Settlement" },
   { value: "reimbursement", label: "Reimbursement" },
 ];
+
+function getLocalDateString(date: Date = new Date()) {
+  return format(date, "yyyy-MM-dd");
+}
 
 interface PendingTransactionApprovalFormProps {
   isOpen: boolean;
@@ -67,52 +74,135 @@ export function PendingTransactionApprovalForm({
   const [selectedReimbursesTransactionId, setSelectedReimbursesTransactionId] =
     useState<string>("none");
   const [loading, setLoading] = useState(false);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  const getExpenseSplitTypes = () => {
-    if (!userNames || userNames.length < 2)
+  const getExpenseSplitTypes = (currentUsers: string[]) => {
+    if (!currentUsers || currentUsers.length < 2)
       return [{ value: "splitEqually", label: "Split Equally" }];
     return [
       { value: "splitEqually", label: "Split Equally" },
-      { value: "user1_only", label: `For ${userNames[0]} Only` },
-      { value: "user2_only", label: `For ${userNames[1]} Only` },
+      { value: "user1_only", label: `For ${currentUsers[0]} Only` },
+      { value: "user2_only", label: `For ${currentUsers[1]} Only` },
     ];
   };
-  const EXPENSE_SPLIT_TYPES = getExpenseSplitTypes();
+  const [EXPENSE_SPLIT_TYPES, setExpenseSplitTypes] = useState<
+    { value: string; label: string }[]
+  >(getExpenseSplitTypes(userNames));
+
+  const availableExpensesForReimbursement = useMemo(() => {
+    if (!transactions) return [];
+    return transactions
+      .filter((t) => t.transaction_type === "expense")
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions]);
 
   useEffect(() => {
-    if (pendingTransaction && isOpen) {
+    if (pendingTransaction && isOpen && categories.length > 0 && userNames.length > 0) {
+      const currentType = pendingTransaction.transaction_type || "expense";
+      setTransactionType(currentType);
+
       // Parse date properly - handle both string and Date objects
       const transactionDate = pendingTransaction.date
         ? typeof pendingTransaction.date === "string"
           ? new Date(pendingTransaction.date)
           : pendingTransaction.date
         : new Date();
-      setDate(transactionDate);
+      const localDate = new Date(transactionDate);
+      const userTimezoneOffset = localDate.getTimezoneOffset() * 60000;
+      setDate(new Date(localDate.getTime() + userTimezoneOffset));
+
       setDescription(pendingTransaction.description || "");
       setAmount(pendingTransaction.amount?.toString() || "");
-      setTransactionType(pendingTransaction.transaction_type || "expense");
-      setSelectedCategoryId(pendingTransaction.category_id || "");
-      setPaidOrReceivedBy(pendingTransaction.paid_by_user_name || "");
-      setPaidToUserName(pendingTransaction.paid_to_user_name || "");
-      setSplitType(pendingTransaction.split_type || "");
-      setSelectedReimbursesTransactionId("none");
-      setDatePickerOpen(false); // Reset date picker state
+      setPaidOrReceivedBy(
+        pendingTransaction.paid_by_user_name === "Shared"
+          ? "Shared"
+          : userNames.includes(pendingTransaction.paid_by_user_name!)
+          ? pendingTransaction.paid_by_user_name!
+          : ""
+      );
+      setSelectedReimbursesTransactionId(
+        pendingTransaction.reimburses_transaction_id || "none"
+      );
+      
+      if (currentType === "settlement") {
+        setPaidToUserName(
+          userNames.includes(pendingTransaction.paid_to_user_name!)
+            ? pendingTransaction.paid_to_user_name!
+            : ""
+        );
+        setSelectedCategoryId("");
+        setSplitType("");
+      } else if (currentType === "expense") {
+        let categoryToEdit = null;
+        if (pendingTransaction.category_id) {
+          categoryToEdit = categories.find(
+            (c) => c.id === pendingTransaction.category_id
+          );
+        }
+        setSelectedCategoryId(
+          categoryToEdit ? categoryToEdit.id : ""
+        );
+        setSplitType(
+          pendingTransaction.split_type &&
+            EXPENSE_SPLIT_TYPES.some(
+              (s) => s.value === pendingTransaction.split_type
+            )
+            ? pendingTransaction.split_type
+            : ""
+        );
+        setPaidToUserName("");
+      } else if (
+        currentType === "income" ||
+        currentType === "reimbursement"
+      ) {
+        setSelectedCategoryId("");
+        setSplitType("");
+        setPaidToUserName("");
+      }
     }
-  }, [pendingTransaction, isOpen]);
+  }, [pendingTransaction, isOpen, categories, userNames, EXPENSE_SPLIT_TYPES]);
+
+  useEffect(() => {
+    setExpenseSplitTypes(getExpenseSplitTypes(userNames));
+  }, [userNames]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!pendingTransaction || !description || !amount) {
-      alert("Please fill in all required fields.");
+    if (
+      !description ||
+      !amount ||
+      isNaN(parseFloat(amount)) ||
+      parseFloat(amount) <= 0
+    ) {
+      alert("Please fill in a valid description and amount.");
+      return;
+    }
+    if (!paidOrReceivedBy) {
+      alert(
+        transactionType === "income" || transactionType === "reimbursement"
+          ? "Please select who received."
+          : "Please select who paid."
+      );
       return;
     }
 
-    const transactionData: Partial<Transaction> = {
-      date: date ? format(date, "yyyy-MM-dd") : pendingTransaction.date,
+    if (!date) {
+      alert("Please select a date.");
+      return;
+    }
+
+    let transactionDataPayload: Partial<Transaction> = {
+      transaction_type: transactionType,
+      date: getLocalDateString(date),
       description,
       amount: parseFloat(amount),
-      transaction_type: transactionType,
+      paid_by_user_name: null,
+      category_id: null,
+      split_type: null,
+      paid_to_user_name: null,
+      reimburses_transaction_id:
+        selectedReimbursesTransactionId === "none"
+          ? null
+          : selectedReimbursesTransactionId,
     };
 
     if (transactionType === "expense") {
@@ -124,30 +214,31 @@ export function PendingTransactionApprovalForm({
         alert("Please select a split type.");
         return;
       }
-      transactionData.category_id = selectedCategoryId;
-      transactionData.split_type = splitType;
-      transactionData.paid_by_user_name = paidOrReceivedBy;
+      transactionDataPayload = {
+        ...transactionDataPayload,
+        category_id: selectedCategoryId,
+        split_type: splitType,
+        paid_by_user_name: paidOrReceivedBy,
+      };
     } else if (transactionType === "settlement") {
-      transactionData.paid_by_user_name = paidOrReceivedBy;
-      transactionData.paid_to_user_name = paidToUserName;
+      transactionDataPayload = {
+        ...transactionDataPayload,
+        paid_by_user_name: paidOrReceivedBy,
+        paid_to_user_name: paidToUserName,
+      };
     } else if (
       transactionType === "income" ||
       transactionType === "reimbursement"
     ) {
-      transactionData.paid_to_user_name = paidOrReceivedBy;
-    }
-
-    if (
-      transactionType === "reimbursement" &&
-      selectedReimbursesTransactionId !== "none"
-    ) {
-      transactionData.reimburses_transaction_id =
-        selectedReimbursesTransactionId;
+      transactionDataPayload = {
+        ...transactionDataPayload,
+        paid_to_user_name: paidOrReceivedBy,
+      };
     }
 
     try {
       setLoading(true);
-      await onApprove(pendingTransaction.id, transactionData);
+      await onApprove(pendingTransaction!.id, transactionDataPayload);
       onClose();
     } catch (error: any) {
       alert("Error approving transaction: " + error.message);
@@ -162,214 +253,205 @@ export function PendingTransactionApprovalForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-b from-[#004D40] to-[#26A69A] text-white border-white/20">
         <DialogHeader>
-          <DialogTitle>Approve Transaction</DialogTitle>
+          <DialogTitle className="text-3xl font-bold text-center">
+            Approve Transaction
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Date */}
-          <div className="space-y-2">
-            <Label>Date</Label>
-            <Popover
-              open={datePickerOpen}
-              onOpenChange={setDatePickerOpen}
-              modal={true}
-            >
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal bg-white/10 text-white border-white/20",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-auto p-0 bg-white z-[100]"
-                align="start"
-                onOpenAutoFocus={(e) => e.preventDefault()}
+        <form onSubmit={handleSubmit} className="space-y-8 pb-24">
+          {/* Transaction Type */}
+          <ToggleGroup
+            type="single"
+            value={transactionType}
+            onValueChange={(value: string) => {
+              if (value) {
+                setTransactionType(value);
+              }
+            }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-2"
+          >
+            {TRANSACTION_TYPES.map((type) => (
+              <ToggleGroupItem
+                key={type.value}
+                value={type.value}
+                className="capitalize data-[state=on]:bg-yellow-400 data-[state=on]:text-teal-900"
               >
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(selectedDate) => {
-                    console.log("Date selected in calendar:", selectedDate);
-                    if (selectedDate) {
-                      setDate(selectedDate);
-                      // Close popover after date selection
-                      setTimeout(() => {
-                        setDatePickerOpen(false);
-                      }, 150);
-                    }
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+                {type.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="bg-white/10 text-white border-white/20"
-              required
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Date */}
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-white/10",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="e.g., Groceries from Walmart"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+                className="bg-white/10"
+              />
+            </div>
           </div>
 
           {/* Amount */}
-          <div className="space-y-2">
-            <Label>Amount</Label>
+          <div className="space-y-2 text-center">
+            <Label htmlFor="amount" className="text-lg">
+              Amount
+            </Label>
             <Input
+              id="amount"
               type="number"
-              step="0.01"
+              inputMode="decimal"
+              placeholder="0.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="bg-white/10 text-white border-white/20"
               required
+              min="0"
+              step="0.01"
+              className="text-5xl font-bold text-center h-auto bg-transparent border-x-0 border-t-0 border-b-2 border-white/50 focus:ring-0 focus:border-yellow-400 transition-colors"
             />
           </div>
 
-          {/* Transaction Type */}
+          {/* Paid by / Received by */}
           <div className="space-y-2">
-            <Label>Transaction Type</Label>
-            <Select value={transactionType} onValueChange={setTransactionType}>
-              <SelectTrigger className="bg-white/10 text-white border-white/20">
-                <SelectValue />
+            <Label htmlFor="paid-by">
+              {transactionType === "income" ||
+              transactionType === "reimbursement"
+                ? "Received by"
+                : "Paid by"}
+            </Label>
+            <Select
+              value={paidOrReceivedBy}
+              onValueChange={setPaidOrReceivedBy}
+            >
+              <SelectTrigger
+                id="paid-by"
+                className="bg-white/10"
+              >
+                <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                {TRANSACTION_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
+                {transactionType === "expense" && (
+                  <SelectItem key="Shared" value="Shared">
+                    Shared
+                  </SelectItem>
+                )}
+                {userNames.map((user) => (
+                  <SelectItem key={user} value={user}>
+                    {user}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Conditional Fields based on Transaction Type */}
+          {/* Conditional Fields */}
           {transactionType === "expense" && (
-            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label>Category *</Label>
+                <Label htmlFor="category">Category</Label>
                 <Select
                   value={selectedCategoryId}
                   onValueChange={setSelectedCategoryId}
                 >
-                  <SelectTrigger className="bg-white/10 text-white border-white/20">
+                  <SelectTrigger
+                    id="category"
+                    className="bg-white/10"
+                  >
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
+                        <div className="flex items-center gap-2">
+                          {cat.image_url && (
+                            <img
+                              src={cat.image_url}
+                              alt={cat.name}
+                              className="w-6 h-6 rounded-full object-cover"
+                            />
+                          )}
+                          <span>{cat.name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label>Paid By *</Label>
+                <Label htmlFor="split-type">Split Type</Label>
                 <Select
-                  value={paidOrReceivedBy}
-                  onValueChange={setPaidOrReceivedBy}
+                  value={splitType}
+                  onValueChange={setSplitType}
                 >
-                  <SelectTrigger className="bg-white/10 text-white border-white/20">
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Shared">Shared</SelectItem>
-                    {userNames.map((user) => (
-                      <SelectItem key={user} value={user}>
-                        {user}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Split Type *</Label>
-                <Select value={splitType} onValueChange={setSplitType}>
-                  <SelectTrigger className="bg-white/10 text-white border-white/20">
+                  <SelectTrigger
+                    id="split-type"
+                    className="bg-white/10"
+                  >
                     <SelectValue placeholder="Select split type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXPENSE_SPLIT_TYPES.map((split) => (
-                      <SelectItem key={split.value} value={split.value}>
-                        {split.label}
+                    {EXPENSE_SPLIT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </>
+            </div>
           )}
 
           {transactionType === "settlement" && (
-            <>
-              <div className="space-y-2">
-                <Label>Paid By *</Label>
-                <Select
-                  value={paidOrReceivedBy}
-                  onValueChange={setPaidOrReceivedBy}
-                >
-                  <SelectTrigger className="bg-white/10 text-white border-white/20">
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {userNames.map((user) => (
-                      <SelectItem key={user} value={user}>
-                        {user}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Paid To *</Label>
-                <Select
-                  value={paidToUserName}
-                  onValueChange={setPaidToUserName}
-                >
-                  <SelectTrigger className="bg-white/10 text-white border-white/20">
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {userNames.map((user) => (
-                      <SelectItem key={user} value={user}>
-                        {user}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
-
-          {(transactionType === "income" ||
-            transactionType === "reimbursement") && (
             <div className="space-y-2">
-              <Label>Received By *</Label>
+              <Label htmlFor="paid-to">Paid to</Label>
               <Select
-                value={paidOrReceivedBy}
-                onValueChange={setPaidOrReceivedBy}
+                value={paidToUserName}
+                onValueChange={setPaidToUserName}
               >
-                <SelectTrigger className="bg-white/10 text-white border-white/20">
+                <SelectTrigger
+                  id="paid-to"
+                  className="bg-white/10"
+                >
                   <SelectValue placeholder="Select user" />
                 </SelectTrigger>
                 <SelectContent>
-                  {userNames.map((user) => (
-                    <SelectItem key={user} value={user}>
-                      {user}
-                    </SelectItem>
-                  ))}
+                  {userNames
+                    .filter((user) => user !== paidOrReceivedBy)
+                    .map((user) => (
+                      <SelectItem key={user} value={user}>
+                        {user}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -377,40 +459,45 @@ export function PendingTransactionApprovalForm({
 
           {transactionType === "reimbursement" && (
             <div className="space-y-2">
-              <Label>Reimburses Transaction</Label>
+              <Label htmlFor="reimburses">Reimburses Transaction</Label>
               <Select
                 value={selectedReimbursesTransactionId}
                 onValueChange={setSelectedReimbursesTransactionId}
               >
-                <SelectTrigger className="bg-white/10 text-white border-white/20">
-                  <SelectValue />
+                <SelectTrigger id="reimburses" className="bg-white/10">
+                  <SelectValue placeholder="Select transaction to reimburse" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {transactions
-                    .filter((t) => t.transaction_type === "expense")
-                    .map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.description} - ${t.amount.toFixed(2)}
-                      </SelectItem>
-                    ))}
+                  {availableExpensesForReimbursement.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.date} - {t.description} ({formatMoney(t.amount)})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Approving..." : "Approve Transaction"}
-            </Button>
+          <div className="fixed bottom-0 left-0 right-0 w-full p-4 z-10">
+            <div className="max-w-2xl mx-auto flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 h-12 text-lg"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-yellow-400 text-teal-900 hover:bg-yellow-500 h-12 text-lg"
+              >
+                {loading ? "Approving..." : "Approve Transaction"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
