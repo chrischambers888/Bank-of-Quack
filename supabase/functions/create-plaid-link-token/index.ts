@@ -65,10 +65,13 @@ serve(async (req) => {
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
+      // For production, include redirect_uri for OAuth institutions
+      ...(plaidEnv === 'production' && {
+        redirect_uri: Deno.env.get('PLAID_REDIRECT_URI') || 'https://bank-of-quack.vercel.app', // Update with your actual URL
+      }),
       // In sandbox, allow more flexible phone verification
       ...(isSandbox && {
-        // Sandbox-specific settings that may help with phone verification
-        webhook: undefined, // Not needed for sandbox
+        webhook: undefined,
       }),
     }
 
