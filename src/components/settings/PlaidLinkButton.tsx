@@ -27,7 +27,34 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
           "create-plaid-link-token"
         );
 
+        console.log("Link token response - data:", data);
+        console.log("Link token response - error:", fetchError);
+
+        // Check if there's an error in the response data (Supabase sometimes puts errors in data)
+        if (data?.error) {
+          console.error("Error in response data:", data.error);
+          console.error("Plaid error details:", data.plaid_error);
+          console.error("Error code:", data.error_code);
+          console.error("Error type:", data.error_type);
+
+          let errorMessage = data.error;
+          if (data.error_code) {
+            errorMessage += ` (Error code: ${data.error_code})`;
+          }
+          if (data.error_type) {
+            errorMessage += ` (Type: ${data.error_type})`;
+          }
+          if (data.plaid_error) {
+            console.error(
+              "Full Plaid error object:",
+              JSON.stringify(data.plaid_error, null, 2)
+            );
+          }
+          throw new Error(errorMessage);
+        }
+
         if (fetchError) {
+          console.error("Fetch error:", fetchError);
           throw fetchError;
         }
 
@@ -40,8 +67,16 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
         }
       } catch (err: any) {
         console.error("Error fetching link token:", err);
-        setError(err.message || "Failed to initialize Plaid connection");
-        onError?.(err.message || "Failed to initialize Plaid connection");
+        console.error("Full error details:", JSON.stringify(err, null, 2));
+        console.error("Error message:", err.message);
+        console.error("Error stack:", err.stack);
+
+        // Try to extract detailed error from response
+        let errorMessage =
+          err.message || "Failed to initialize Plaid connection";
+
+        setError(errorMessage);
+        onError?.(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -127,31 +162,75 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
         console.error("Plaid Link exit error:", err);
         console.error("Error details:", JSON.stringify(err, null, 2));
         console.error("Metadata:", JSON.stringify(metadata, null, 2));
+        console.error("Error code:", err.error_code);
+        console.error("Error type:", err.error_type);
+        console.error("Display message:", err.display_message);
+        console.error("Error message:", err.error_message);
 
         // Provide more helpful error messages
+        let errorMessage =
+          err.error_message ||
+          err.display_message ||
+          err.message ||
+          "Connection cancelled";
+
+        if (err.error_code) {
+          errorMessage += ` (Code: ${err.error_code})`;
+        }
+        if (err.error_type) {
+          errorMessage += ` (Type: ${err.error_type})`;
+        }
+
         if (
           err.error_message?.toLowerCase().includes("phone") ||
           err.error_message?.toLowerCase().includes("too_short")
         ) {
-          setError(
-            "Phone verification issue. In Sandbox mode, use test number: +15005550001 with verification code: 1234"
-          );
-        } else {
-          setError(err.error_message || err.message || "Connection cancelled");
+          errorMessage =
+            "Phone verification issue. In Sandbox mode, use test number: +15005550001 with verification code: 1234";
         }
+
+        setError(errorMessage);
       }
     },
     onEvent: (eventName: string, metadata: any) => {
-      console.log("Plaid Link event:", eventName, metadata);
-      if (eventName === "ERROR" && metadata?.error_message) {
-        console.error("Plaid Link error event:", metadata.error_message);
-        if (
-          metadata.error_message?.toLowerCase().includes("phone") ||
-          metadata.error_message?.toLowerCase().includes("too_short")
-        ) {
-          setError(
-            "Phone verification issue. In Sandbox mode, use test number: +15005550001 with verification code: 1234"
-          );
+      console.log("Plaid Link event:", eventName);
+      console.log("Event metadata:", JSON.stringify(metadata, null, 2));
+      if (eventName === "ERROR") {
+        console.error(
+          "Plaid Link error event - Error code:",
+          metadata?.error_code
+        );
+        console.error(
+          "Plaid Link error event - Error type:",
+          metadata?.error_type
+        );
+        console.error(
+          "Plaid Link error event - Display message:",
+          metadata?.display_message
+        );
+        console.error(
+          "Plaid Link error event - Error message:",
+          metadata?.error_message
+        );
+
+        if (metadata?.error_message) {
+          let errorMessage = metadata.error_message;
+          if (metadata.error_code) {
+            errorMessage += ` (Code: ${metadata.error_code})`;
+          }
+          if (metadata.error_type) {
+            errorMessage += ` (Type: ${metadata.error_type})`;
+          }
+
+          if (
+            metadata.error_message?.toLowerCase().includes("phone") ||
+            metadata.error_message?.toLowerCase().includes("too_short")
+          ) {
+            errorMessage =
+              "Phone verification issue. In Sandbox mode, use test number: +15005550001 with verification code: 1234";
+          }
+
+          setError(errorMessage);
         }
       }
     },

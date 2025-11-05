@@ -72,9 +72,20 @@ serve(async (req) => {
       }),
     }
 
+    console.log('Creating link token with request:', JSON.stringify({
+      user: { client_user_id: userId },
+      client_name: request.client_name,
+      products: request.products,
+      country_codes: request.country_codes,
+      isSandbox,
+      environment: plaidEnv
+    }, null, 2))
+
     // Generate link token
     const response = await plaidClient.linkTokenCreate(request)
     const link_token = response.data.link_token
+
+    console.log('Link token created successfully for environment:', plaidEnv)
 
     return new Response(
       JSON.stringify({ link_token, plaid_env: plaidEnv }),
@@ -84,10 +95,51 @@ serve(async (req) => {
     )
   } catch (error: any) {
     console.error('Error creating link token:', error)
+    console.error('Full error object:', JSON.stringify(error, null, 2))
+    
+    // Extract detailed Plaid error information
+    let errorMessage = 'Failed to create link token'
+    let plaidErrorDetails = null
+    let statusCode = 400
+    
+    // Check for Plaid API error response
+    if (error.response?.data) {
+      plaidErrorDetails = error.response.data
+      errorMessage = plaidErrorDetails.error_message || plaidErrorDetails.error?.error_message || errorMessage
+      console.error('Plaid error code:', plaidErrorDetails.error_code || plaidErrorDetails.error?.error_code)
+      console.error('Plaid error type:', plaidErrorDetails.error_type || plaidErrorDetails.error?.error_type)
+      console.error('Plaid error details:', JSON.stringify(plaidErrorDetails, null, 2))
+      statusCode = error.response.status || 400
+    } else if (error.body) {
+      try {
+        plaidErrorDetails = typeof error.body === 'string' ? JSON.parse(error.body) : error.body
+        errorMessage = plaidErrorDetails.error_message || plaidErrorDetails.error?.error_message || errorMessage
+        console.error('Plaid error from body:', JSON.stringify(plaidErrorDetails, null, 2))
+      } catch (e) {
+        console.error('Could not parse error body:', e)
+      }
+    } else if (error.message) {
+      errorMessage = error.message
+      console.error('Error message:', errorMessage)
+    }
+    
+    // Log the request that failed for debugging
+    console.error('Failed request configuration:', {
+      plaidEnv,
+      hasClientId: !!Deno.env.get('PLAID_CLIENT_ID'),
+      hasSecret: !!Deno.env.get('PLAID_SECRET'),
+      userId
+    })
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to create link token' }),
+      JSON.stringify({ 
+        error: errorMessage,
+        plaid_error: plaidErrorDetails,
+        error_code: plaidErrorDetails?.error_code || plaidErrorDetails?.error?.error_code,
+        error_type: plaidErrorDetails?.error_type || plaidErrorDetails?.error?.error_type
+      }),
       { 
-        status: 400, 
+        status: statusCode, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       },
     )
