@@ -2,21 +2,92 @@
 import { usePlaidLink } from "react-plaid-link";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/supabaseClient";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 interface PlaidLinkButtonProps {
   onSuccess?: () => void;
   onError?: (error: string) => void;
 }
 
+const LINK_TOKEN_STORAGE_KEY = "plaid_link_token";
+const LINK_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes (Link tokens expire after ~30 minutes)
+
 export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSandbox, setIsSandbox] = useState<boolean | null>(null);
+  const [receivedRedirectUri, setReceivedRedirectUri] = useState<string | null>(
+    null
+  );
+  const location = useLocation();
+  const hasInitializedRef = useRef(false);
+  const hasFetchedTokenRef = useRef(false);
 
+  // Check if we're returning from an OAuth redirect
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const oauthStateId = params.get("oauth_state_id");
+    const error = params.get("error");
+
+    // Check if there's an OAuth error from the bank
+    if (error && !oauthStateId) {
+      console.error("OAuth error from bank:", error);
+      const errorDescription =
+        params.get("error_description") || "OAuth authentication failed";
+      setError(`Bank OAuth error: ${errorDescription}`);
+      // Clear URL params
+      window.history.replaceState({}, "", location.pathname);
+      return;
+    }
+
+    if (oauthStateId && !receivedRedirectUri) {
+      // We're returning from an OAuth redirect
+      // IMPORTANT: Keep the full URL with query params for receivedRedirectUri
+      const currentUrl = window.location.href;
+      console.log("OAuth redirect detected!");
+      console.log("  - receivedRedirectUri:", currentUrl);
+      console.log("  - oauth_state_id:", oauthStateId);
+      setReceivedRedirectUri(currentUrl);
+
+      // Try to restore link token from localStorage
+      try {
+        const stored = localStorage.getItem(LINK_TOKEN_STORAGE_KEY);
+        if (stored) {
+          const { token, timestamp } = JSON.parse(stored);
+          const age = Date.now() - timestamp;
+          if (age < LINK_TOKEN_EXPIRY_MS) {
+            console.log("Restored link token from localStorage");
+            setLinkToken(token);
+            hasFetchedTokenRef.current = true; // Mark as fetched so we don't fetch again
+            // Don't clear URL yet - we need it for receivedRedirectUri
+            // It will be cleared after Link reinitializes
+            return; // Don't fetch new token, use the stored one
+          } else {
+            console.log("Stored link token expired, will fetch new one");
+            localStorage.removeItem(LINK_TOKEN_STORAGE_KEY);
+          }
+        }
+      } catch (e) {
+        console.error("Error reading stored link token:", e);
+      }
+    }
+  }, [location.search, receivedRedirectUri]);
+
+  // Fetch link token - only once on mount or when needed for OAuth redirect
+  useEffect(() => {
+    // Skip if we already fetched (unless we're handling OAuth redirect without a stored token)
+    if (hasFetchedTokenRef.current && !receivedRedirectUri) {
+      return;
+    }
+
+    // If we're handling OAuth redirect and already have a token from localStorage, skip
+    if (receivedRedirectUri && linkToken) {
+      return;
+    }
+
     // Get link token from Edge Function and check environment
     const fetchLinkToken = async () => {
       try {
@@ -62,6 +133,20 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
           setLinkToken(data.link_token);
           // Set sandbox mode based on environment from API
           setIsSandbox(data.plaid_env === "sandbox");
+          hasFetchedTokenRef.current = true;
+
+          // Store link token in localStorage for OAuth redirect handling
+          try {
+            localStorage.setItem(
+              LINK_TOKEN_STORAGE_KEY,
+              JSON.stringify({
+                token: data.link_token,
+                timestamp: Date.now(),
+              })
+            );
+          } catch (e) {
+            console.warn("Failed to store link token in localStorage:", e);
+          }
         } else {
           throw new Error("No link token received");
         }
@@ -83,7 +168,9 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
     };
 
     fetchLinkToken();
-  }, [onError]);
+    // Only run when receivedRedirectUri changes (for OAuth) or on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receivedRedirectUri, onError]);
 
   const onSuccessCallback = async (public_token: string, metadata: any) => {
     try {
@@ -141,7 +228,25 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
         setLinkToken(newLinkToken.link_token);
         // Update environment state from refreshed token response
         setIsSandbox(newLinkToken.plaid_env === "sandbox");
+
+        // Store new link token in localStorage
+        try {
+          localStorage.setItem(
+            LINK_TOKEN_STORAGE_KEY,
+            JSON.stringify({
+              token: newLinkToken.link_token,
+              timestamp: Date.now(),
+            })
+          );
+        } catch (e) {
+          console.warn("Failed to store link token in localStorage:", e);
+        }
       }
+
+      // Clear OAuth redirect state and URL params
+      setReceivedRedirectUri(null);
+      hasInitializedRef.current = false;
+      window.history.replaceState({}, "", location.pathname);
 
       onSuccess?.();
     } catch (err: any) {
@@ -156,6 +261,8 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
 
   const config = {
     token: linkToken,
+    // Include receivedRedirectUri when returning from OAuth redirect
+    ...(receivedRedirectUri && { receivedRedirectUri }),
     onSuccess: onSuccessCallback,
     onExit: (err: any, metadata: any) => {
       if (err) {
@@ -181,6 +288,25 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
           errorMessage += ` (Type: ${err.error_type})`;
         }
 
+        // Handle OAuth-related errors
+        if (
+          err.error_code === "REQUIRES_OAUTH" ||
+          err.exit_status === "requires_oauth" ||
+          err.error_message?.toLowerCase().includes("oauth") ||
+          err.error_message?.toLowerCase().includes("redirect") ||
+          metadata?.exit_status === "requires_oauth"
+        ) {
+          errorMessage +=
+            "\n\n⚠️ OAuth Required: This institution requires OAuth authentication.\n" +
+            "Please verify:\n" +
+            "1. Redirect URI is registered in Plaid Dashboard (Team Settings → Allowed redirect URIs)\n" +
+            "2. Redirect URI matches exactly: " +
+            (window.location.origin || "your production URL") +
+            "\n" +
+            "3. You're using production environment (PLAID_ENV=production)\n" +
+            "4. The redirect URI in your code matches what's registered in Dashboard";
+        }
+
         if (
           err.error_message?.toLowerCase().includes("phone") ||
           err.error_message?.toLowerCase().includes("too_short")
@@ -190,6 +316,14 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
         }
 
         setError(errorMessage);
+
+        // Clear receivedRedirectUri and URL params after exit
+        setReceivedRedirectUri(null);
+        hasInitializedRef.current = false;
+        window.history.replaceState({}, "", location.pathname);
+      } else {
+        // Even if no error, clear URL params when exiting (user cancelled, etc.)
+        window.history.replaceState({}, "", location.pathname);
       }
     },
     onEvent: (eventName: string, metadata: any) => {
@@ -222,6 +356,20 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
             errorMessage += ` (Type: ${metadata.error_type})`;
           }
 
+          // Handle OAuth-related errors
+          if (
+            metadata.error_code === "REQUIRES_OAUTH" ||
+            metadata.error_message?.toLowerCase().includes("oauth") ||
+            metadata.error_message?.toLowerCase().includes("redirect")
+          ) {
+            errorMessage +=
+              "\n\nNote: This institution requires OAuth. Make sure you have:\n" +
+              "1. Registered the redirect URI in Plaid Dashboard (Team Settings → Allowed redirect URIs)\n" +
+              "2. Set PLAID_ENV=production in your Supabase Edge Function secrets\n" +
+              "3. The redirect URI matches exactly: " +
+              (window.location.origin || "your production URL");
+          }
+
           if (
             metadata.error_message?.toLowerCase().includes("phone") ||
             metadata.error_message?.toLowerCase().includes("too_short")
@@ -237,6 +385,25 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
   };
 
   const { open, ready } = usePlaidLink(config);
+
+  // Auto-open Link when returning from OAuth redirect
+  useEffect(() => {
+    if (
+      receivedRedirectUri &&
+      linkToken &&
+      ready &&
+      !hasInitializedRef.current
+    ) {
+      console.log("Auto-opening Link after OAuth redirect");
+      hasInitializedRef.current = true;
+      // DO NOT clear URL params yet - Link needs them (oauth_state_id) for OAuth state validation
+      // They will be cleared in onSuccess or onExit callbacks after Link processes them
+      // Use setTimeout to ensure Link is fully ready
+      setTimeout(() => {
+        open();
+      }, 100);
+    }
+  }, [receivedRedirectUri, linkToken, ready, open, location.pathname]);
 
   if (loading && !linkToken) {
     return (

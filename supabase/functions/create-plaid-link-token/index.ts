@@ -66,8 +66,10 @@ serve(async (req) => {
       country_codes: [CountryCode.Us],
       language: 'en',
       // For production, include redirect_uri for OAuth institutions
+      // Note: The redirect URI should be the base URL where PlaidLinkButton is rendered
+      // For React Router apps, Plaid will redirect back to the same page where Link was opened
       ...(plaidEnv === 'production' && {
-        redirect_uri: Deno.env.get('PLAID_REDIRECT_URI') || 'https://bank-of-quack.vercel.app', // Update with your actual URL
+        redirect_uri: Deno.env.get('PLAID_REDIRECT_URI') || 'https://bank-of-quack.vercel.app', // Base URL - Plaid will redirect to the same page
       }),
       // In sandbox, allow more flexible phone verification
       ...(isSandbox && {
@@ -75,11 +77,13 @@ serve(async (req) => {
       }),
     }
 
+    // Log the request (excluding sensitive data, but including redirect_uri to verify OAuth setup)
     console.log('Creating link token with request:', JSON.stringify({
       user: { client_user_id: userId },
       client_name: request.client_name,
       products: request.products,
       country_codes: request.country_codes,
+      redirect_uri: request.redirect_uri || 'NOT SET',
       isSandbox,
       environment: plaidEnv
     }, null, 2))
