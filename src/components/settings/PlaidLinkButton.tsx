@@ -17,14 +17,7 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
   const [isSandbox, setIsSandbox] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check if we're in sandbox mode (you could also make this an API call to check env)
-    // For now, we'll detect based on the error messages or make it configurable
-    // In a real app, you might want to add an endpoint that returns the current environment
-    setIsSandbox(true); // Default to true for now - update this when switching to production
-  }, []);
-
-  useEffect(() => {
-    // Get link token from Edge Function
+    // Get link token from Edge Function and check environment
     const fetchLinkToken = async () => {
       try {
         setLoading(true);
@@ -40,6 +33,8 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
 
         if (data?.link_token) {
           setLinkToken(data.link_token);
+          // Set sandbox mode based on environment from API
+          setIsSandbox(data.plaid_env === "sandbox");
         } else {
           throw new Error("No link token received");
         }
@@ -109,6 +104,8 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
       );
       if (newLinkToken?.link_token) {
         setLinkToken(newLinkToken.link_token);
+        // Update environment state from refreshed token response
+        setIsSandbox(newLinkToken.plaid_env === "sandbox");
       }
 
       onSuccess?.();

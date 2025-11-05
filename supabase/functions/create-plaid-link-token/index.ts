@@ -77,7 +77,7 @@ serve(async (req) => {
     const link_token = response.data.link_token
 
     return new Response(
-      JSON.stringify({ link_token }),
+      JSON.stringify({ link_token, plaid_env: plaidEnv }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       },
