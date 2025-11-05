@@ -251,13 +251,14 @@ export function PendingTransactionApprovalForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-b from-[#004D40] to-[#26A69A] text-white border-white/20">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 bg-gradient-to-b from-[#004D40] to-[#26A69A] text-white border-white/20">
+        <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle className="text-3xl font-bold text-center">
             Approve Transaction
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-8 pb-24">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 space-y-8 pb-4">
           {/* Transaction Type */}
           <ToggleGroup
             type="single"
@@ -479,8 +480,9 @@ export function PendingTransactionApprovalForm({
             </div>
           )}
 
-          <div className="fixed bottom-0 left-0 right-0 w-full p-4 z-10">
-            <div className="max-w-2xl mx-auto flex gap-4">
+          </div>
+          <div className="w-full p-4 border-t border-white/10 bg-gradient-to-b from-transparent via-[#004D40] to-[#004D40] flex-shrink-0">
+            <div className="flex gap-4">
               <Button
                 type="button"
                 variant="outline"
