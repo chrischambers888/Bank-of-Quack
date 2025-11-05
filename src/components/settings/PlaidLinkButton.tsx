@@ -45,13 +45,20 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
 
     if (oauthStateId && !receivedRedirectUri) {
       // We're returning from an OAuth redirect
-      // IMPORTANT: Keep the full URL with query params for receivedRedirectUri
+      // IMPORTANT: receivedRedirectUri must be the EXACT URL that Plaid redirected to (full URL with query params)
+      // This must match the redirect_uri used when creating the link token (base URL)
+      // But receivedRedirectUri should be the full redirected URL
       const currentUrl = window.location.href;
       console.log("OAuth redirect detected!");
-      console.log("  - receivedRedirectUri:", currentUrl);
+      console.log("  - receivedRedirectUri (full):", currentUrl);
       console.log("  - oauth_state_id:", oauthStateId);
+      console.log("  - origin:", window.location.origin);
+      console.log("  - pathname:", window.location.pathname);
+      console.log("  - search:", window.location.search);
       setReceivedRedirectUri(currentUrl);
 
+      // When returning from OAuth, we should use the same link token that was used initially
+      // The link token is tied to the redirect_uri and OAuth state, so we must use the original token
       // Try to restore link token from localStorage
       try {
         const stored = localStorage.getItem(LINK_TOKEN_STORAGE_KEY);
@@ -59,7 +66,8 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
           const { token, timestamp } = JSON.parse(stored);
           const age = Date.now() - timestamp;
           if (age < LINK_TOKEN_EXPIRY_MS) {
-            console.log("Restored link token from localStorage");
+            console.log("Restored link token from localStorage for OAuth continuation");
+            console.log("  - Token age:", Math.round(age / 1000), "seconds");
             setLinkToken(token);
             hasFetchedTokenRef.current = true; // Mark as fetched so we don't fetch again
             // Don't clear URL yet - we need it for receivedRedirectUri
@@ -67,8 +75,11 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
             return; // Don't fetch new token, use the stored one
           } else {
             console.log("Stored link token expired, will fetch new one");
+            console.log("  - Token age:", Math.round(age / 1000), "seconds (expires at", LINK_TOKEN_EXPIRY_MS / 1000, "seconds)");
             localStorage.removeItem(LINK_TOKEN_STORAGE_KEY);
           }
+        } else {
+          console.log("No stored link token found, will fetch new one");
         }
       } catch (e) {
         console.error("Error reading stored link token:", e);
@@ -395,13 +406,19 @@ export function PlaidLinkButton({ onSuccess, onError }: PlaidLinkButtonProps) {
       !hasInitializedRef.current
     ) {
       console.log("Auto-opening Link after OAuth redirect");
+      console.log("  - Config receivedRedirectUri:", receivedRedirectUri);
+      console.log("  - Current window.location.href:", window.location.href);
+      console.log("  - Link ready:", ready);
+      console.log("  - Link token exists:", !!linkToken);
+      
       hasInitializedRef.current = true;
       // DO NOT clear URL params yet - Link needs them (oauth_state_id) for OAuth state validation
       // They will be cleared in onSuccess or onExit callbacks after Link processes them
-      // Use setTimeout to ensure Link is fully ready
+      // Use a longer timeout to ensure Link is fully ready and config is updated
       setTimeout(() => {
+        console.log("Opening Link with receivedRedirectUri:", receivedRedirectUri);
         open();
-      }, 100);
+      }, 300);
     }
   }, [receivedRedirectUri, linkToken, ready, open, location.pathname]);
 
