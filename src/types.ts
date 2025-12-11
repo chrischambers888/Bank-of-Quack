@@ -116,49 +116,6 @@ export interface TransactionWithBudget extends Transaction {
   budget_remaining_amount?: number;
 }
 
-export interface ConnectedAccount {
-  id: string;
-  created_at?: string;
-  user_id: string;
-  account_type: 'checking' | 'savings' | 'credit_card' | 'investment';
-  provider: string;
-  account_name: string;
-  account_last_four?: string;
-  plaid_item_id?: string;
-  plaid_access_token?: string;
-  plaid_account_id?: string;
-  institution_id?: string;
-  institution_name?: string;
-  is_active: boolean;
-  last_synced_at?: string;
-  sync_frequency: 'manual' | 'daily' | 'weekly';
-  error_code?: string;
-  needs_reauth: boolean;
-  metadata?: any;
-}
-
-export interface PendingTransaction {
-  id: string;
-  created_at?: string;
-  date: string;
-  description: string;
-  amount: number;
-  transaction_type: string;
-  category_id?: string | null;
-  category_name?: string | null;
-  connected_account_id: string;
-  plaid_transaction_id?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'edited';
-  paid_by_user_name?: string | null;
-  split_type?: string | null;
-  paid_to_user_name?: string | null;
-  raw_data?: any;
-  approved_at?: string;
-  rejected_at?: string;
-  approved_by_user_id?: string;
-  transaction_id?: string | null;
-}
-
 export interface BudgetSummary {
   category_id: string;
   category_name: string;

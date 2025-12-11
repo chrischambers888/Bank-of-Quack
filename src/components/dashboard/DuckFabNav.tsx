@@ -5,60 +5,39 @@ import {
   Settings as SettingsIcon,
   LogOut,
   DollarSign,
-  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/supabaseClient";
-import { usePendingTransactionsCount } from "@/hooks/usePendingTransactionsCount";
 
 interface NavLink {
   label: string;
   icon: React.ReactElement;
   to: string;
-  badge?: number;
 }
 
-const getNavLinks = (pendingCount: number, hasAnyPendingTransactions: boolean): NavLink[] => {
-  const links: NavLink[] = [
-    {
-      label: "Dashboard",
-      icon: <Home className="w-6 h-6 text-green-500" />,
-      to: "/",
-    },
-  ];
-
-  // Only show Pending link if there are any pending transactions (any status)
-  if (hasAnyPendingTransactions) {
-    links.push({
-      label: "Pending",
-      icon: <Clock className="w-6 h-6 text-green-500" />,
-      to: "/pending",
-      badge: pendingCount > 0 ? pendingCount : undefined,
-    });
-  }
-
-  links.push(
-    {
-      label: "New Transaction",
-      icon: <Plus className="w-6 h-6 text-green-500" />,
-      to: "/transactions",
-    },
-    {
-      label: "Budgets",
-      icon: <DollarSign className="w-6 h-6 text-green-500" />,
-      to: "/budgets",
-    },
-    {
-      label: "Settings",
-      icon: <SettingsIcon className="w-6 h-6 text-green-500" />,
-      to: "/settings",
-    }
-  );
-
-  return links;
-};
+const navLinks: NavLink[] = [
+  {
+    label: "Dashboard",
+    icon: <Home className="w-6 h-6 text-green-500" />,
+    to: "/",
+  },
+  {
+    label: "New Transaction",
+    icon: <Plus className="w-6 h-6 text-green-500" />,
+    to: "/transactions",
+  },
+  {
+    label: "Budgets",
+    icon: <DollarSign className="w-6 h-6 text-green-500" />,
+    to: "/budgets",
+  },
+  {
+    label: "Settings",
+    icon: <SettingsIcon className="w-6 h-6 text-green-500" />,
+    to: "/settings",
+  },
+];
 
 interface DuckFabNavProps {
   open: boolean;
@@ -68,8 +47,6 @@ interface DuckFabNavProps {
 const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
-  const [hasAnyPendingTransactions, setHasAnyPendingTransactions] = useState(false);
-  const { count: pendingCount } = usePendingTransactionsCount();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -79,52 +56,6 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
       setLoggedIn(!!session);
     };
     checkSession();
-  }, []);
-
-  // Check if there are any pending transactions (any status)
-  useEffect(() => {
-    const checkAnyPendingTransactions = async () => {
-      try {
-        const { count, error } = await supabase
-          .from("pending_transactions")
-          .select("*", { count: "exact", head: true });
-
-        if (error) throw error;
-        setHasAnyPendingTransactions((count || 0) > 0);
-      } catch (error) {
-        console.error("Error checking pending transactions:", error);
-        setHasAnyPendingTransactions(false);
-      }
-    };
-
-    checkAnyPendingTransactions();
-
-    // Set up real-time subscription to listen for any changes to pending_transactions
-    const subscription = supabase
-      .channel("pending_transactions_total_changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "pending_transactions",
-        },
-        () => {
-          checkAnyPendingTransactions();
-        }
-      )
-      .subscribe();
-
-    // Listen for custom event to trigger refetch (for immediate updates after sync)
-    const handleRefetchEvent = () => {
-      checkAnyPendingTransactions();
-    };
-    window.addEventListener("pendingTransactionsTotal:refetch", handleRefetchEvent);
-
-    return () => {
-      subscription.unsubscribe();
-      window.removeEventListener("pendingTransactionsTotal:refetch", handleRefetchEvent);
-    };
   }, []);
 
   const handleNav = (to: string) => {
@@ -137,8 +68,6 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
     await supabase.auth.signOut();
     navigate("/login", { replace: true });
   };
-
-  const navLinks = getNavLinks(pendingCount, hasAnyPendingTransactions);
 
   return (
     <>
@@ -167,13 +96,8 @@ const DuckFabNav: React.FC<DuckFabNavProps> = ({ open, setOpen }) => {
             className="flex items-center group relative"
             style={{ transitionDelay: `${open ? i * 60 : 0}ms` }}
           >
-            <span className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center transition-transform group-active:scale-95 relative">
+            <span className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center transition-transform group-active:scale-95">
               {link.icon}
-              {link.badge && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-500 hover:bg-red-600">
-                  {link.badge > 99 ? "99+" : link.badge}
-                </Badge>
-              )}
             </span>
           </button>
         ))}
