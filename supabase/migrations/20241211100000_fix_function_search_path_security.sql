@@ -92,7 +92,7 @@ ALTER FUNCTION public.copy_sector_budgets_from_month(integer, integer, integer, 
 DO $$
 BEGIN
   -- Try to alter the 5-param version if it exists
-  EXECUTE 'ALTER FUNCTION public.copy_sector_budgets_from_month(integer, integer, integer, integer, integer) SET search_path = ''';
+  EXECUTE 'ALTER FUNCTION public.copy_sector_budgets_from_month(integer, integer, integer, integer, integer) SET search_path = ''''';
 EXCEPTION
   WHEN undefined_function THEN
     -- Function doesn't exist with this signature, skip it
@@ -106,7 +106,7 @@ END $$;
 -- upsert_budget_period - may be an old function or created outside migrations
 DO $$
 BEGIN
-  EXECUTE 'ALTER FUNCTION public.upsert_budget_period() SET search_path = ''';
+  EXECUTE 'ALTER FUNCTION public.upsert_budget_period() SET search_path = ''''';
 EXCEPTION
   WHEN undefined_function THEN
     NULL;
@@ -115,7 +115,7 @@ END $$;
 -- check_category_before_delete - may be an old function or created outside migrations
 DO $$
 BEGIN
-  EXECUTE 'ALTER FUNCTION public.check_category_before_delete() SET search_path = ''';
+  EXECUTE 'ALTER FUNCTION public.check_category_before_delete() SET search_path = ''''';
 EXCEPTION
   WHEN undefined_function THEN
     NULL;
