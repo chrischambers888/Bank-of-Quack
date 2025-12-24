@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(git log --oneline --all --grep=\"budget\" -i)"
+    ]
+  }
+}
